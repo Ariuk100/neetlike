@@ -169,7 +169,6 @@ useEffect(() => {
                     {subOpen && (
                       <div className="absolute top-0 left-full ml-1 bg-white border rounded shadow w-44 z-50">
                         <Link href="/moderator/tests/create" className="block px-4 py-2 hover:bg-gray-100">Нэг нэгээр хийх</Link>
-                        <Link href="/moderator/tests/upload" className="block px-4 py-2 hover:bg-gray-100">Татаж оруулах</Link>
                       </div>
                     )}
                   </div>

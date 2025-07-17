@@ -14,11 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import LatexRenderer from '@/components/LatexRenderer';
-import { uploadFileToR2 } from '@/lib/uploadFileToR2';
-import { db } from '@/lib/firebase';
+import LatexRenderer from '@/components/LatexRenderer'; // LatexRenderer компонентыг импортлосон
+import { uploadFileToR2 } from '@/lib/uploadFileToR2'; // R2 Storage руу файл байршуулах функц
+import { db } from '@/lib/firebase'; // Firestore instance
 import { collection, addDoc } from 'firebase/firestore';
-
+import { toast } from 'sonner'; // sonner toast-ийг импортлосон
 
 export default function TeacherTestPage() {
   const [form, setForm] = useState({
@@ -40,6 +40,7 @@ export default function TeacherTestPage() {
     timeLimit: 0,
     tableAnswerJson: '',
   });
+  const [isSaving, setIsSaving] = useState(false); // Хадгалах үйлдэл хийгдэж байгаа эсэхийг хянах
 
   // 'value: any' -г 'value: unknown' болгон өөрчилсөн
   const handleInputChange = (key: string, value: unknown) => {
@@ -47,15 +48,19 @@ export default function TeacherTestPage() {
   };
 
   const handleSave = async () => {
+    setIsSaving(true); // Хадгалах үйлдэл эхэллээ
     try {
+      // Асуултын зургийг R2 руу байршуулах
       const questionImageUrl = form.questionImageFile
         ? await uploadFileToR2(form.questionImageFile)
         : null;
   
+      // Бодолтын зургийг R2 руу байршуулах
       const explanationImageUrl = form.explanationImage
         ? await uploadFileToR2(form.explanationImage)
         : null;
   
+      // Сонголтуудын зургуудыг R2 руу байршуулах
       const optionImageUrls = await Promise.all(
         form.imageFiles.map((file) =>
           file ? uploadFileToR2(file) : Promise.resolve(null)
@@ -81,24 +86,49 @@ export default function TeacherTestPage() {
         source: form.source,
         timeLimit: form.timeLimit,
         tableAnswerJson: form.tableAnswerJson || '',
-        createdAt: new Date(),
+        createdAt: new Date(), // Үүсгэсэн огноог нэмсэн
       };
   
       // Firestore руу хадгалах
       const docRef = await addDoc(collection(db, 'test'), questionData);
       console.log('Амжилттай хадгаллаа:', docRef.id);
       console.log('Firestore-д хадгалах өгөгдөл:', questionData);
+      toast.success('Тест амжилттай хадгалагдлаа!'); // Амжилттай хадгалсан тухай мэдэгдэл
+      
+      // Формыг цэвэрлэх
+      setForm({
+        question: '',
+        questionImageFile: null,
+        answerType: 'choice-single',
+        options: ['', '', '', '', '', ''],
+        correctAnswer: '',
+        imageFiles: [null, null, null, null, null, null],
+        explanation: '',
+        explanationImage: null,
+        subject: '',
+        topic: '',
+        subtopic: '',
+        bloom: '',
+        difficulty: '',
+        score: 1,
+        source: '',
+        timeLimit: 0,
+        tableAnswerJson: '',
+      });
+
     } catch (err: unknown) {
       const errorAsAny = err as { message?: string };
       console.error('Хадгалахад алдаа гарлаа:', errorAsAny);
       // Хэрэглэгчид мэдэгдэл өгөх
-      alert(`Хадгалахад алдаа гарлаа: ${errorAsAny.message || 'Үл мэдэгдэх алдаа'}`);
+      toast.error(`Хадгалахад алдаа гарлаа: ${errorAsAny.message || 'Үл мэдэгдэх алдаа'}`);
+    } finally {
+      setIsSaving(false); // Хадгалах үйлдэл дууслаа
     }
   };
 
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto py-10">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto py-10 px-4">
       {/* Left: Form */}
       <div className="space-y-4">
         <Card>
@@ -106,9 +136,9 @@ export default function TeacherTestPage() {
             <CardTitle>Тест оруулах</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Label>Төрөл</Label>
+            <Label htmlFor="answerType">Төрөл</Label>
             <Select value={form.answerType} onValueChange={(v) => handleInputChange('answerType', v)}>
-              <SelectTrigger><SelectValue placeholder="Тестийн төрөл" /></SelectTrigger>
+              <SelectTrigger id="answerType"><SelectValue placeholder="Тестийн төрөл" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="choice-single">Нэг сонголттой</SelectItem>
                 <SelectItem value="choice-multiple">Олон сонголттой</SelectItem>
@@ -119,14 +149,15 @@ export default function TeacherTestPage() {
               </SelectContent>
             </Select>
 
-            <Label>Асуулт</Label>
+            <Label htmlFor="question">Асуулт</Label>
             <Textarea
-              placeholder="Асуултын текст"
+              id="question"
+              placeholder="Асуултын текст (Latex ашиглаж болно)"
               value={form.question}
               onChange={(e) => handleInputChange('question', e.target.value)}
             />
-            <Label>Асуултын зураг</Label>
-            <Input type="file" accept="image/*" onChange={(e) => handleInputChange('questionImageFile', e.target.files?.[0] || null)} />
+            <Label htmlFor="questionImageFile">Асуултын зураг</Label>
+            <Input id="questionImageFile" type="file" accept="image/*" onChange={(e) => handleInputChange('questionImageFile', e.target.files?.[0] || null)} />
 
             {(form.answerType === 'choice-single' || form.answerType === 'choice-multiple') && (
               <>
@@ -153,23 +184,23 @@ export default function TeacherTestPage() {
                     />
                   </div>
                 ))}
-                <Label>Зөв хариулт</Label>
-                <Input value={form.correctAnswer} onChange={(e) => handleInputChange('correctAnswer', e.target.value)} />
+                <Label htmlFor="correctAnswer">Зөв хариулт</Label>
+                <Input id="correctAnswer" value={form.correctAnswer} onChange={(e) => handleInputChange('correctAnswer', e.target.value)} />
               </>
             )}
 
             {['input', 'problem', 'experiment'].includes(form.answerType) && (
               <>
-                <Label>Зөв хариулт</Label>
-                <Input value={form.correctAnswer} onChange={(e) => handleInputChange('correctAnswer', e.target.value)} />
+                <Label htmlFor="correctAnswerInput">Зөв хариулт</Label>
+                <Input id="correctAnswerInput" value={form.correctAnswer} onChange={(e) => handleInputChange('correctAnswer', e.target.value)} />
               </>
             )}
 
             {form.answerType === 'truefalse' && (
               <>
-                <Label>Зөв хариулт</Label>
+                <Label htmlFor="correctAnswerTrueFalse">Зөв хариулт</Label>
                 <Select value={form.correctAnswer} onValueChange={(v) => handleInputChange('correctAnswer', v)}>
-                  <SelectTrigger><SelectValue placeholder="Зөв хариулт" /></SelectTrigger>
+                  <SelectTrigger id="correctAnswerTrueFalse"><SelectValue placeholder="Зөв хариулт" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="true">Үнэн</SelectItem>
                     <SelectItem value="false">Худал</SelectItem>
@@ -178,28 +209,29 @@ export default function TeacherTestPage() {
               </>
             )}
 
-            <Label>Бодолт</Label>
+            <Label htmlFor="explanation">Бодолт</Label>
             <Textarea
+              id="explanation"
               placeholder="Latex форматаар бодолт"
               value={form.explanation}
               onChange={(e) => handleInputChange('explanation', e.target.value)}
             />
-            <Label>Бодолтын зураг</Label>
-            <Input type="file" accept="image/*" onChange={(e) => handleInputChange('explanationImage', e.target.files?.[0] || null)} />
+            <Label htmlFor="explanationImage">Бодолтын зураг</Label>
+            <Input id="explanationImage" type="file" accept="image/*" onChange={(e) => handleInputChange('explanationImage', e.target.files?.[0] || null)} />
 
-            <Label>Хичээл</Label>
-            <Input value={form.subject} onChange={(e) => handleInputChange('subject', e.target.value)} />
-            <Label>Сэдэв</Label>
-            <Input value={form.topic} onChange={(e) => handleInputChange('topic', e.target.value)} />
-            <Label>Дэд сэдэв</Label>
-            <Input value={form.subtopic} onChange={(e) => handleInputChange('subtopic', e.target.value)} />
+            <Label htmlFor="subject">Хичээл</Label>
+            <Input id="subject" value={form.subject} onChange={(e) => handleInputChange('subject', e.target.value)} />
+            <Label htmlFor="topic">Сэдэв</Label>
+            <Input id="topic" value={form.topic} onChange={(e) => handleInputChange('topic', e.target.value)} />
+            <Label htmlFor="subtopic">Дэд сэдэв</Label>
+            <Input id="subtopic" value={form.subtopic} onChange={(e) => handleInputChange('subtopic', e.target.value)} />
 
-            <Label>Оноо</Label>
-            <Input type="number" value={form.score} onChange={(e) => handleInputChange('score', Number(e.target.value))} />
+            <Label htmlFor="score">Оноо</Label>
+            <Input id="score" type="number" value={form.score} onChange={(e) => handleInputChange('score', Number(e.target.value))} />
 
-            <Label>Bloom&#39;s</Label>
+            <Label htmlFor="bloom">Bloom&#39;s</Label>
             <Select value={form.bloom} onValueChange={(v) => handleInputChange('bloom', v)}>
-              <SelectTrigger><SelectValue placeholder="Bloom&#39;s" /></SelectTrigger>
+              <SelectTrigger id="bloom"><SelectValue placeholder="Bloom&#39;s" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="МЭДЭХ">МЭДЭХ</SelectItem>
                 <SelectItem value="ОЙЛГОХ">ОЙЛГОХ</SelectItem>
@@ -210,9 +242,9 @@ export default function TeacherTestPage() {
               </SelectContent>
             </Select>
 
-            <Label>Хүндрэл</Label>
+            <Label htmlFor="difficulty">Хүндрэл</Label>
             <Select value={form.difficulty} onValueChange={(v) => handleInputChange('difficulty', v)}>
-              <SelectTrigger><SelectValue placeholder="Түвшин" /></SelectTrigger>
+              <SelectTrigger id="difficulty"><SelectValue placeholder="Түвшин" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="амархан">Амархан</SelectItem>
                 <SelectItem value="дунд">Дунд</SelectItem>
@@ -220,9 +252,9 @@ export default function TeacherTestPage() {
               </SelectContent>
             </Select>
 
-            <Label>Source</Label>
+            <Label htmlFor="source">Source</Label>
             <Select value={form.source} onValueChange={(v) => handleInputChange('source', v)}>
-              <SelectTrigger><SelectValue placeholder="Эх сурвалж" /></SelectTrigger>
+              <SelectTrigger id="source"><SelectValue placeholder="Эх сурвалж" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="IGCSE">IGCSE</SelectItem>
                 <SelectItem value="IB">IB</SelectItem>
@@ -237,10 +269,12 @@ export default function TeacherTestPage() {
               </SelectContent>
             </Select>
 
-            <Label>Хугацаа (сек)</Label>
-            <Input type="number" value={form.timeLimit} onChange={(e) => handleInputChange('timeLimit', Number(e.target.value))} />
+            <Label htmlFor="timeLimit">Хугацаа (сек)</Label>
+            <Input id="timeLimit" type="number" value={form.timeLimit} onChange={(e) => handleInputChange('timeLimit', Number(e.target.value))} />
 
-            <Button onClick={handleSave}>Хадгалах</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Хадгалж байна...' : 'Хадгалах'}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -273,7 +307,7 @@ export default function TeacherTestPage() {
                   <div className="relative w-20 h-20"> {/* Жижиг зургийн хэмжээг тохируулсан */}
                     <Image 
                       src={URL.createObjectURL(form.imageFiles[idx]!)} 
-                      alt={`img-${idx}`} 
+                      alt={`Сонголтын зураг ${idx + 1}`} 
                       fill // Эцэг элементийн хэмжээг дүүргэнэ
                       style={{ objectFit: 'contain' }} // Зургийг хайчлахгүйгээр тааруулна
                       className="rounded border" 
@@ -309,13 +343,13 @@ export default function TeacherTestPage() {
                 />
               </div>
             )}
-            <p><b>Хичээл:</b> {form.subject}</p>
-            <p><b>Сэдэв:</b> {form.topic}</p>
-            <p><b>Дэд сэдэв:</b> {form.subtopic}</p>
+            <p><b>Хичээл:</b> {form.subject || '-'}</p>
+            <p><b>Сэдэв:</b> {form.topic || '-'}</p>
+            <p><b>Дэд сэдэв:</b> {form.subtopic || '-'}</p>
             <p><b>Оноо:</b> {form.score}</p>
-            <p><b>Bloom&#39;s:</b> {form.bloom}</p>
-            <p><b>Хүндрэл:</b> {form.difficulty}</p>
-            <p><b>Source:</b> {form.source}</p>
+            <p><b>Bloom&#39;s:</b> {form.bloom || '-'}</p>
+            <p><b>Хүндрэл:</b> {form.difficulty || '-'}</p>
+            <p><b>Source:</b> {form.source || '-'}</p>
             <p><b>Хугацаа:</b> {form.timeLimit} сек</p>
           </CardContent>
         </Card>

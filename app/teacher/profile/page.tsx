@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/app/context/AuthContext'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase' // Assuming db is correctly initialized from firebase config
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
 
 // AuthContext-ээс CustomUser interface-ийг импортлох нь зүйтэй,
 // ингэснээр user объектын төрөл зөв тодорхойлогдоно.
@@ -19,20 +20,19 @@ interface CustomUser {
   email: string | null;
   displayName: string | null;
   phoneNumber: string | null;
-  role?: string; // This should come from Firestore
+  role?: string;
   name?: string;
   phone?: string;
   school?: string;
-  grade?: string;
   lastName?: string;
-  teacherId?: string; // (for students)
   gender?: 'male' | 'female' | 'other';
   birthYear?: number;
   province?: string;
   district?: string;
+  readableId?: string; // readableId талбарыг нэмсэн
 }
 
-// Mongolian province and district list
+// Монголын аймаг, сум/дүүргийн жагсаалт
 const MONGOLIAN_LOCATIONS = [
   {
     province: 'Улаанбаатар',
@@ -210,53 +210,44 @@ const MONGOLIAN_LOCATIONS = [
 ];
 
 
-export default function StudentProfilePage() {
-  // Use CustomUser interface to type the user object from useAuth
+export default function TeacherProfilePage() { // Компонентын нэрийг TeacherProfilePage болгож өөрчилсөн
+  // useAuth-аас user, loading-г авна, CustomUser интерфейсээр төрлийг тодорхойлно
   const { user: authUser, loading: authLoading } = useAuth() as { user: CustomUser | null; loading: boolean };
-  
-  const [name, setName] = useState('')
+  const router = useRouter()
+
+  // Шинэ талбаруудын state хувьсагчид
+  const [name, setName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('')
-  const [school, setSchool] = useState('')
-  const [grade, setGrade] = useState('')
-  const [teacherId, setTeacherId] = useState('');
+  const [phone, setPhone] = useState('');
+  const [school, setSchool] = useState('');
   const [gender, setGender] = useState<'' | 'male' | 'female' | 'other'>('');
   const [birthYear, setBirthYear] = useState<string | number>('');
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
 
   const [loading, setLoading] = useState(false)
-  const [availableDistricts, setAvailableDistricts] = useState<string[]>([]); // Districts available based on selected province
+  const [availableDistricts, setAvailableDistricts] = useState<string[]>([]); // Сонгосон аймгийн сум/дүүрэг
 
   useEffect(() => {
-    if (authUser?.uid) {
-      const fetchProfile = async () => {
-        const docRef = doc(db, 'users', authUser.uid)
-        const docSnap = await getDoc(docRef)
-        if (docSnap.exists()) {
-          const data = docSnap.data() as CustomUser
-          setName(data.name || '')
-          setLastName(data.lastName || '');
-          setPhone(data.phone || '')
-          setSchool(data.school || '')
-          setGrade(data.grade || '')
-          setTeacherId(data.teacherId || '');
-          setGender((data.gender as 'male' | 'female' | 'other' | '') || '');
-          setBirthYear(data.birthYear || '');
-          setProvince(data.province || '');
-          setDistrict(data.district || '');
-        }
-      }
-      fetchProfile()
+    if (authUser) {
+      // authUser датагаар state-үүдийг эхлүүлнэ
+      setName(authUser.name || authUser.displayName || '');
+      setPhone(authUser.phone || authUser.phoneNumber || '');
+      setSchool(authUser.school || '');
+      setLastName(authUser.lastName || '');
+      setGender((authUser.gender as 'male' | 'female' | 'other' | '') || '');
+      setBirthYear(authUser.birthYear || '');
+      setProvince(authUser.province || ''); // Аймаг утгыг оноосон
+      setDistrict(authUser.district || ''); // Сум/дүүрэг утгыг оноосон
     }
   }, [authUser])
 
-  // Update available districts when province changes
+  // Аймаг сонгогдох үед сум/дүүргийг шинэчлэх
   useEffect(() => {
     const selectedProvinceData = MONGOLIAN_LOCATIONS.find(loc => loc.province === province);
     if (selectedProvinceData) {
       setAvailableDistricts(selectedProvinceData.districts);
-      // If the current district is not in the new list, clear it
+      // Сонгосон сум/дүүрэг нь шинэ аймгийн жагсаалтад байхгүй бол хоосон болгоно
       if (district && !selectedProvinceData.districts.includes(district)) {
         setDistrict('');
       }
@@ -264,10 +255,40 @@ export default function StudentProfilePage() {
       setAvailableDistricts([]);
       setDistrict('');
     }
-  }, [province, district]); // Added district to dependencies to correctly clear if old value is not in new list
+  }, [province, district]);
+
+  const handleSave = async () => {
+    if (!authUser) return;
+    try {
+      setLoading(true);
+      const userRef = doc(db, 'users', authUser.uid);
+
+      // dataToUpdate объектын төрлийг Record<string, string | number | null | undefined> болгон зассан
+      const dataToUpdate: Record<string, string | number | null | undefined> = {
+        name: name,
+        phone: phone,
+        school: school,
+        lastName: lastName,
+        gender: gender === '' ? null : gender, // Хоосон бол null болгоно
+        birthYear: typeof birthYear === 'number' ? birthYear : (birthYear === '' ? null : Number(birthYear)), // Хоосон эсвэл тоо биш бол null болгоно
+        province: province === '' ? null : province, // Хоосон бол null болгоно
+        district: district === '' ? null : district, // Хоосон бол null болгоно
+      };
+
+      await updateDoc(userRef, dataToUpdate);
+      toast.success('Амжилттай хадгалагдлаа!'); // Амжилттай хадгалагдлаа!
+      router.push('/teacher?updated=true'); // Багшийн самбар руу буцах
+    } catch (err) {
+      console.error('Update error:', err);
+      toast.error('Алдаа гарлаа'); // Алдаа гарлаа
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBirthYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    // Зөвхөн тоо эсвэл хоосон байвал утгыг онооно
     if (value === '' || /^\d+$/.test(value)) {
       setBirthYear(value === '' ? '' : Number(value));
     }
@@ -275,107 +296,82 @@ export default function StudentProfilePage() {
 
   const handleProvinceChange = (value: string) => {
     setProvince(value);
-    setDistrict(''); // Clear district when province changes
+    setDistrict(''); // Аймаг солигдох үед сум/дүүргийг цэвэрлэнэ
   };
 
   const handleDistrictChange = (value: string) => {
     setDistrict(value);
   };
 
-  const saveProfile = async () => {
-    if (!authUser?.uid) return
-    setLoading(true)
-    try {
-      // Corrected type for dataToUpdate to avoid 'Unexpected any' error
-      const dataToUpdate: Record<string, string | number | null | undefined> = {
-        name,
-        phone,
-        school,
-        grade,
-        lastName,
-        gender: gender === '' ? null : gender,
-        birthYear: typeof birthYear === 'number' ? birthYear : (birthYear === '' ? null : Number(birthYear)),
-        province: province === '' ? null : province, // Set to null if empty
-        district: district === '' ? null : district, // Set to null if empty
-      };
-
-      if (authUser.role === 'student') {
-        dataToUpdate.teacherId = teacherId;
-      }
-
-      await updateDoc(doc(db, 'users', authUser.uid), dataToUpdate)
-      toast.success('Профайл амжилттай шинэчлэгдлээ!') // Profile updated successfully!
-    } catch (error: unknown) {
-      const err = error as Error
-      toast.error(`Алдаа гарлаа: ${err.message}`) // An error occurred: ${err.message}
-    } finally {
-      setLoading(false)
-    }
-  }
-
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Ачаалж байна...</div>; // Loading...
+    return <div className="min-h-screen flex items-center justify-center">Ачаалж байна...</div>; // Ачаалж байна...
   }
 
-  if (!authUser || authUser.role !== 'student') {
-    return <div className="p-4 text-red-500">Зөвшөөрөлгүй хандалт. Та энэ хуудсанд нэвтрэх эрхгүй байна.</div>; // Unauthorized access. You do not have permission to access this page.
+  // Зөвхөн багшийн эрхтэй хэрэглэгчдэд хандахыг зөвшөөрнө
+  if (!authUser || authUser.role !== 'teacher') {
+    return <div className="p-4 text-red-500">Зөвшөөрөлгүй хандалт</div>; // Зөвшөөрөлгүй хандалт
   }
 
   return (
-    <div className="max-w-xl mx-auto py-12 px-6">
-      <h1 className="text-3xl font-bold mb-6">Сурагчийн Профайл</h1> {/* Student Profile */}
-      <div className="space-y-4">
-        <p><strong>Имэйл:</strong> {authUser.email}</p>
-        
+    <div className="max-w-2xl mx-auto mt-10 space-y-6 px-4">
+      <h1 className="text-2xl font-bold">Багшийн профайл</h1> {/* Гарчгийг өөрчилсөн */}
+      <div className="bg-white border p-4 rounded shadow space-y-4">
+        {/* Имэйл хаяг (засах боломжгүй) */}
         <div>
-          <Label htmlFor="name">Нэр</Label> {/* Name */}
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div>
-          <Label htmlFor="lastName">Овог</Label> {/* Last Name */}
-          <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-        </div>
-        <div>
-          <Label htmlFor="phone">Утас</Label> {/* Phone */}
-          <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <div>
-          <Label htmlFor="school">Сургууль</Label> {/* School */}
-          <Input id="school" value={school} onChange={(e) => setSchool(e.target.value)} />
-        </div>
-        <div>
-          <Label htmlFor="grade">Анги</Label> {/* Grade */}
-          <Input id="grade" value={grade} onChange={(e) => setGrade(e.target.value)} />
+          <Label className="block font-medium mb-1">Имэйл:</Label> {/* Имэйл: */}
+          <p className="text-gray-700">{authUser.email}</p>
         </div>
 
-        {authUser.role === 'student' && (
+        {/* readableId (засах боломжгүй) */}
+        {authUser.readableId && (
           <div>
-            <Label htmlFor="teacherId">Багшийн ID</Label> {/* Teacher ID */}
-            <Input id="teacherId" value={teacherId} onChange={(e) => setTeacherId(e.target.value)} />
+            <Label className="block font-medium mb-1">Хэрэглэгчийн ID:</Label> {/* Хэрэглэгчийн ID: */}
+            <p className="text-gray-700">{authUser.readableId}</p>
           </div>
         )}
-        
+
         <div>
-          <Label htmlFor="gender">Хүйс</Label> {/* Gender */}
+          <Label htmlFor="name" className="block font-medium mb-1">Нэр:</Label> {/* Нэр: */}
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        <div>
+          <Label htmlFor="lastName" className="block font-medium mb-1">Овог:</Label> {/* Овог: */}
+          <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        </div>
+
+        <div>
+          <Label htmlFor="phone" className="block font-medium mb-1">Утас:</Label> {/* Утас: */}
+          <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+
+        <div>
+          <Label htmlFor="school" className="block font-medium mb-1">Харьяа сургууль:</Label> {/* Харьяа сургууль: */}
+          <Input id="school" value={school} onChange={(e) => setSchool(e.target.value)} />
+        </div>
+
+        <div>
+          <Label htmlFor="gender" className="block font-medium mb-1">Хүйс:</Label> {/* Хүйс: */}
           <Select value={gender} onValueChange={(value) => setGender(value as 'male' | 'female' | 'other' | '')}>
-            <SelectTrigger id="gender"><SelectValue placeholder="Хүйс сонгоно уу" /></SelectTrigger> {/* Select Gender */}
+            <SelectTrigger id="gender"><SelectValue placeholder="Хүйс сонгоно уу" /></SelectTrigger> {/* Хүйс сонгоно уу */}
             <SelectContent>
-              <SelectItem value="male">Эрэгтэй</SelectItem> {/* Male */}
-              <SelectItem value="female">Эмэгтэй</SelectItem> {/* Female */}
-              <SelectItem value="other">Бусад</SelectItem> {/* Other */}
+              <SelectItem value="male">Эрэгтэй</SelectItem> {/* Эрэгтэй */}
+              <SelectItem value="female">Эмэгтэй</SelectItem> {/* Эмэгтэй */}
+              <SelectItem value="other">Бусад</SelectItem> {/* Бусад */}
             </SelectContent>
           </Select>
         </div>
+
         <div>
-          <Label htmlFor="birthYear">Төрсөн он</Label> {/* Birth Year */}
+          <Label htmlFor="birthYear" className="block font-medium mb-1">Төрсөн он:</Label> {/* Төрсөн он: */}
           <Input id="birthYear" type="number" value={birthYear} onChange={handleBirthYearChange} />
         </div>
-        
-        {/* Province selection */}
+
+        {/* Аймаг сонгох хэсэг */}
         <div>
-          <Label htmlFor="province">Аймаг</Label> {/* Province */}
+          <Label htmlFor="province" className="block font-medium mb-1">Аймаг:</Label> {/* Аймаг: */}
           <Select value={province} onValueChange={handleProvinceChange}>
-            <SelectTrigger id="province"><SelectValue placeholder="Аймаг сонгоно уу" /></SelectTrigger> {/* Select Province */}
+            <SelectTrigger id="province"><SelectValue placeholder="Аймаг сонгоно уу" /></SelectTrigger> {/* Аймаг сонгоно уу */}
             <SelectContent>
               {MONGOLIAN_LOCATIONS.map((loc) => (
                 <SelectItem key={loc.province} value={loc.province}>
@@ -386,11 +382,11 @@ export default function StudentProfilePage() {
           </Select>
         </div>
 
-        {/* District/Soum selection (enabled after province is selected) */}
+        {/* Сум/Дүүрэг сонгох хэсэг (аймаг сонгогдсоны дараа идэвхжинэ) */}
         <div>
-          <Label htmlFor="district">{province === 'Улаанбаатар' ? 'Дүүрэг' : 'Сум'}</Label> {/* District/Soum */}
+          <Label htmlFor="district" className="block font-medium mb-1">{province === 'Улаанбаатар' ? 'Дүүрэг' : 'Сум'}:</Label> {/* Дүүрэг/Сум: */}
           <Select value={district} onValueChange={handleDistrictChange} disabled={!province}>
-            <SelectTrigger id="district"><SelectValue placeholder="Сум/Дүүрэг сонгоно уу" /></SelectTrigger> {/* Select District/Soum */}
+            <SelectTrigger id="district"><SelectValue placeholder="Сум/Дүүрэг сонгоно уу" /></SelectTrigger> {/* Сум/Дүүрэг сонгоно уу */}
             <SelectContent>
               {availableDistricts.map((dist) => (
                 <SelectItem key={dist} value={dist}>
@@ -401,10 +397,14 @@ export default function StudentProfilePage() {
           </Select>
         </div>
 
-        <Button onClick={saveProfile} disabled={loading}>
-          {loading ? 'Хадгалж байна...' : 'Хадгалах'} {/* Saving... : Save */}
+        <Button onClick={handleSave} disabled={loading}>
+          Хадгалах {/* Хадгалах */}
         </Button>
       </div>
+
+      <Button variant="outline" onClick={() => router.push('/teacher')}>
+        ← Самбар руу буцах {/* ← Самбар руу буцах */}
+      </Button>
     </div>
   )
 }
