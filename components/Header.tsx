@@ -17,13 +17,12 @@ export default function Header() {
   const pathname = usePathname()
 
   const [mainOpen, setMainOpen] = useState(false)
-  const [subOpen, setSubOpen] = useState(false)
+  const [createSubOpen, setCreateSubOpen] = useState(false) // "Тест хийх" цэсийн sub-dropdown-д зориулсан
+  const [viewSubOpen, setViewSubOpen] = useState(false); // "Тест харах" цэсийн sub-dropdown-д зориулсан
   const [profileOpen, setProfileOpen] = useState(false)
 
   const profileRef = useRef<HTMLDivElement>(null)
-  const mainDropdownRef = useRef<HTMLDivElement>(null)
-
-  // ...
+  const mainDropdownRef = useRef<HTMLDivElement>(null) // Энэ нь "Тестүүд" үндсэн цэсийг удирдах ref
 
 useEffect(() => {
   const handleClickOutside = (event: MouseEvent) => {
@@ -35,7 +34,8 @@ useEffect(() => {
 
     if (mainDropdownRef.current && !mainDropdownRef.current.contains(target)) {
       setMainOpen(false)
-      setSubOpen(false)
+      setCreateSubOpen(false) // createSubOpen-ийг хаах
+      setViewSubOpen(false); // viewSubOpen-ийг хаах
     }
   }
 
@@ -48,7 +48,8 @@ useEffect(() => {
 // ✅ pathname өөрчлөгдөх үед бүх цэс хаах
 useEffect(() => {
   setMainOpen(false)
-  setSubOpen(false)
+  setCreateSubOpen(false) // createSubOpen-ийг хаах
+  setViewSubOpen(false); // viewSubOpen-ийг хаах
   setProfileOpen(false)
 }, [pathname])
 
@@ -57,16 +58,33 @@ useEffect(() => {
   const handleLogout = async () => {
     try {
       await signOut(auth) // Firebase client-с гарах
+      console.log('Firebase client-side logout successful.'); // Нэмэлт лог
   
-      await fetch('/api/logout', {
+      const response = await fetch('/api/logout', {
         method: 'POST',
-      }) // ✅ session cookie устгах
+      }); // ✅ session cookie устгах
   
-      router.push('/auth') // Нэвтрэх хуудас руу буцах
-    } catch (err) {
-      console.error('Logout error:', err)
+      if (!response.ok) {
+        // Серверээс ирсэн алдааг илүү тодорхой харуулах
+        const errorData = await response.json();
+        console.error('Server-side logout API error:', errorData);
+        throw new Error(errorData.error || 'Серверээс гарах үйлдэл амжилтгүй боллоо.');
+      }
+      console.log('Server-side logout API successful.'); // Нэмэлт лог
+  
+      // 🔴 ЭНДХИЙГ ӨӨРЧИЛСӨН: Үндсэн хуудас руу шилжүүлж, Middleware-ийг дахин ажиллуулах
+      // Энэ нь хуучин төлөвийг цэвэрлэхэд тустай.
+      router.replace('/'); // Эсвэл router.push('/login'); хэрэв та login хуудас руу шууд чиглүүлэхийг хүсвэл
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) { // 'any' to 'unknown' and then assert if possible
+      const errorMessage = (err instanceof Error) ? err.message : 'Үл мэдэгдэх алдаа гарлаа.';
+      console.error('Logout error:', errorMessage, err); // Алдааны объектыг бүрэн хэвлэх
+      // Хэрэглэгчид мэдэгдэл харуулах (жишээ нь, toast эсвэл alert)
+      // toast.error(`Гарах үед алдаа гарлаа: ${errorMessage}`);
+      alert(`Гарах үед алдаа гарлаа: ${errorMessage}`);
     }
   }
+  
 
   const handleLogoClick = () => {
     if (!user) return
@@ -111,12 +129,12 @@ useEffect(() => {
 
                       <div className="relative">
                         <button
-                          onClick={() => setSubOpen(!subOpen)}
+                          onClick={() => setCreateSubOpen(!createSubOpen)} // createSubOpen-ийг ашиглана
                           className="w-full text-left px-4 py-2 hover:bg-gray-100"
                         >
                           Бүх шалгалт ▸
                         </button>
-                        {subOpen && (
+                        {createSubOpen && ( // createSubOpen-ийг ашиглана
                           <div className="absolute top-0 left-full ml-1 bg-white border rounded shadow w-44 z-50">
                             <Link href="/student/exams/eesh" className="block px-4 py-2 hover:bg-gray-100">ЭЕШ</Link>
                             <Link href="/student/tests/math" className="block px-4 py-2 hover:bg-gray-100">Математик</Link>
@@ -161,14 +179,30 @@ useEffect(() => {
               
                   <div className="relative">
                     <button
-                      onClick={() => setSubOpen(!subOpen)}
+                      onClick={() => setCreateSubOpen(!createSubOpen)} // createSubOpen-ийг ашиглана
                       className="w-full text-left px-4 py-2 hover:bg-gray-100"
                     >
                       Тест хийх ▸
                     </button>
-                    {subOpen && (
+                    {createSubOpen && ( // createSubOpen-ийг ашиглана
                       <div className="absolute top-0 left-full ml-1 bg-white border rounded shadow w-44 z-50">
                         <Link href="/moderator/tests/create" className="block px-4 py-2 hover:bg-gray-100">Нэг нэгээр хийх</Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Шинэ нэмэлт: Тест харах цэс */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setViewSubOpen(!viewSubOpen)} // viewSubOpen-ийг ашиглана
+                      className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                    >
+                      Тест харах ▸
+                    </button>
+                    {viewSubOpen && ( // viewSubOpen-ийг ашиглана
+                      <div className="absolute top-0 left-full ml-1 bg-white border rounded shadow w-44 z-50">
+                        <Link href="/moderator/tests/view" className="block px-4 py-2 hover:bg-gray-100">Тест харах</Link>
+                        {/* Энд нэмэлт тест харах сонголтууд нэмж болно */}
                       </div>
                     )}
                   </div>
@@ -190,10 +224,6 @@ useEffect(() => {
               </Button>
             </Link>
           )}
-
-
-
-
 
 {user && (
   <div className="relative z-10  flex items-center gap-3" ref={profileRef}>

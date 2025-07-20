@@ -1,25 +1,24 @@
-// app/context/AuthContext.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore'; // Firestore imports
-import { auth, db } from '@/lib/firebase'; // Firebase auth and db instances
+import { doc, getDoc, setDoc } from 'firebase/firestore'; 
+import { auth, db } from '@/lib/firebase'; 
 
 // Хэрэглэгчийн мэдээллийн төрлийг тодорхойлно
 // Firebase User обьектийг өргөжүүлсэн
 interface CustomUser extends User {
-  role?: string; // Custom Claim-ээс ирэх role
-  name?: string; // Firestore эсвэл displayName-ээс ирэх нэр
-  phone?: string; // Firestore-оос ирэх утасны дугаар
-  school?: string; // Firestore-оос ирэх сургууль
-  lastName?: string; // Firestore-оос ирэх овог
-  teacherId?: string; // Firestore-оос ирэх багшийн ID (сурагч бол)
-  gender?: 'male' | 'female' | 'other'; // Firestore-оос ирэх хүйс
-  birthYear?: number; // Firestore-оос ирэх төрсөн он
-  province?: string; // Firestore-оос ирэх аймаг
-  district?: string; // Firestore-оос ирэх сум
-  readableId?: string; // Firestore-оос ирэх readableId
+  role?: string; 
+  name?: string; 
+  phone?: string; 
+  school?: string; 
+  lastName?: string; 
+  teacherId?: string; 
+  gender?: 'male' | 'female' | 'other'; 
+  birthYear?: number | null; // null-ийг нэмсэн
+  province?: string; 
+  district?: string; 
+  readableId?: string; 
 }
 
 // AuthContext-ийн утгын төрлийг тодорхойлно
@@ -42,14 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // ID Token-г хүчээр шинэчилж, Custom Claims-г авна
           const idTokenResult = await firebaseUser.getIdTokenResult(true);
-          
           console.log('AuthContext: Full ID Token Claims:', idTokenResult.claims);
 
-          const customRole = idTokenResult.claims.role as string || 'student'; // Role-г Custom Claims-ээс авна
+          const customRole = idTokenResult.claims.role as string || 'student';
 
-          // Firestore-оос хэрэглэгчийн нэмэлт мэдээллийг татах
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
           
@@ -58,17 +54,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             firestoreUserData = userDocSnap.data() as Partial<CustomUser>;
             console.log('AuthContext: Firestore User Data:', firestoreUserData);
           } else {
-            console.warn('AuthContext: User document not found in Firestore for UID:', firebaseUser.uid);
-            // Хэрэв Firestore-д байхгүй бол эхний бүртгэлийг хийх шаардлагатай байж болно.
-            // Эсвэл Cloud Function нь readableId-г үүсгэхээс өмнө энд ачаалж байж болно.
+            console.warn('AuthContext: User document not found in Firestore for UID:', firebaseUser.uid, '. Creating new document...');
+            
+            // � ЭНДХИЙГ ЗАСАВ: birthYear-ийг null утгаар шууд оноосон.
+            const initialUserData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Хэрэглэгч',
+              role: customRole, 
+              createdAt: new Date().toISOString(),
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Хэрэглэгч',
+              lastName: '',
+              phone: '',
+              school: '',
+              teacherId: '',
+              gender: 'other' as 'male' | 'female' | 'other', 
+              birthYear: null as number | null, // 🔴 ЭНДХИЙГ ЗАСАВ: null утгыг тодорхой оноосон
+              province: '',
+              district: '',
+              readableId: '', 
+            };
+            await setDoc(userDocRef, initialUserData);
+            firestoreUserData = initialUserData; 
+            console.log('AuthContext: New user document created in Firestore for UID:', firebaseUser.uid);
           }
 
-          // CustomUser объект үүсгэнэ
           const customUser: CustomUser = {
-            ...firebaseUser, // Firebase User-ийн үндсэн талбарууд (uid, email, displayName, photoURL)
-            ...firestoreUserData, // Firestore-оос ирсэн нэмэлт талбарууд (name, phone, school, lastName, gender, birthYear, province, district, readableId)
-            role: customRole, // Custom Claims-ээс ирсэн role (Firestore-ын role-оос илүү нэгдүгээр эрэмбэтэй)
-            // Name-ийг Firestore-оос эсвэл displayName-ээс авна
+            ...firebaseUser, 
+            ...firestoreUserData, 
+            role: customRole, 
             name: firestoreUserData.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Хэрэглэгч',
           };
           setUser(customUser);

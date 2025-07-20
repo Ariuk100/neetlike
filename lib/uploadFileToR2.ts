@@ -1,21 +1,28 @@
 // lib/uploadFileToR2.ts
+import { toast } from 'sonner';
+
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
 export async function uploadFileToR2(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
 
-  // Файлыг Next.js API маршрут руу илгээнэ
-  const res = await fetch('/api/upload-to-r2', { // Энэ нь одоо таны сервер талын API руу хандана
-    method: 'POST',
-    body: formData,
-  });
+    const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/upload-to-r2`, {
+      method: 'POST',
+      body: formData,
+    });
 
-  if (!res.ok) {
-    // Серверээс ирсэн алдааны мэдээллийг авахыг оролдоно
-    // 🔴 Засвар: errorData-ийн төрлийг тодорхой зааж өгсөн
-    const errorData = (await res.json()) as { error?: string };
-    throw new Error(errorData.error || 'Файл байршуулахад алдаа гарлаа.');
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData?.error || 'Файл байршуулахад алдаа гарлаа.');
+    }
+
+    const data = await res.json();
+    return data.key;
+     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    toast.error(`Файл байршуулахад алдаа гарлаа: ${error.message}`);
+    throw error;
   }
-
-  const data = (await res.json()) as { url: string };
-  return data.url;
 }

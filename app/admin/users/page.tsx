@@ -1,4 +1,3 @@
-// app/admin/users/page.tsx
 'use client'; // Энэ нь клиент талын компонент гэдгийг заана
 
 import { useState, useEffect } from 'react';
@@ -48,7 +47,7 @@ interface UserData {
   grade?: string;
   role: 'student' | 'teacher' | 'moderator' | 'admin';
   readableId?: string;
-  createdAt?: Date;
+  createdAt?: Date; // Одоо Date объект эсвэл undefined байж болно
   lastName?: string;
   teacherId?: string;
   gender?: 'male' | 'female' | 'other';
@@ -56,6 +55,39 @@ interface UserData {
   province?: string;
   district?: string;
 }
+
+// createdAt талбарыг Date объект руу аюулгүйгээр хөрвүүлэх функц
+// Энэ функц нь Timestamp, String, Number зэрэг төрлүүдийг Date руу хөрвүүлнэ.
+const convertToDate = (timestamp: Date | { toDate: () => Date } | string | number | undefined | null): Date | undefined => {
+  if (!timestamp) {
+    return undefined;
+  }
+  // Хэрэв аль хэдийн Date объект байвал шууд буцаана
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  // Хэрэв Firestore Timestamp объект байвал toDate() ашиглана
+  // Firestore Timestamp нь { seconds: number, nanoseconds: number, toDate: Function } гэсэн бүтэцтэй байдаг.
+  if (typeof timestamp === 'object' && timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  // Хэрэв string (ISO 8601) байвал new Date() ашиглана
+  if (typeof timestamp === 'string') {
+    const parsedDate = new Date(timestamp);
+    // Огноо хүчинтэй эсэхийг шалгана
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+  }
+  // Хэрэв number (Unix timestamp) байвал new Date() ашиглана
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp);
+  }
+  // Бусад тохиолдолд undefined буцаана
+  console.warn('Unknown timestamp format for createdAt:', timestamp);
+  return undefined;
+};
+
 
 export default function AdminUsersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -108,7 +140,8 @@ export default function AdminUsersPage() {
             grade: data.grade || '',
             role: data.role || 'student',
             readableId: data.readableId || '',
-            createdAt: data.createdAt?.toDate(),
+            // Алдааг засах хэсэг: convertToDate функцийг ашиглана
+            createdAt: convertToDate(data.createdAt), 
             lastName: data.lastName || '',
             teacherId: data.teacherId || '',
             gender: data.gender || '',
@@ -205,7 +238,7 @@ export default function AdminUsersPage() {
         birthYear: typeof formState.birthYear === 'number' ? formState.birthYear : null,
         province: formState.province,
         district: formState.district,
-        createdAt: new Date(),
+        createdAt: new Date(), // Firestore нь Date объектыг Timestamp болгон автоматаар хөрвүүлдэг
       });
 
       const apiResponse = await fetch('/api/admin/set-user-role', {
@@ -575,5 +608,4 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
+  )}

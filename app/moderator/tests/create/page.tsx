@@ -19,9 +19,12 @@ import { uploadFileToR2 } from '@/lib/uploadFileToR2'; // R2 Storage руу фа
 import { db } from '@/lib/firebase'; // Firestore instance
 import { collection, addDoc } from 'firebase/firestore';
 import { toast } from 'sonner'; // sonner toast-ийг импортлосон
+import { useAuth } from '@/app/context/AuthContext'; // useAuth-г импортлосон
 
 export default function TeacherTestPage() {
+  const { user } = useAuth(); // Нэвтэрсэн хэрэглэгчийн мэдээллийг авах
   const [form, setForm] = useState({
+    questionNumber: '' as string | number, // Шинээр нэмэгдсэн: Асуултын дугаар
     question: '',
     questionImageFile: null as File | null,
     answerType: 'choice-single',
@@ -42,12 +45,16 @@ export default function TeacherTestPage() {
   });
   const [isSaving, setIsSaving] = useState(false); // Хадгалах үйлдэл хийгдэж байгаа эсэхийг хянах
 
-  // 'value: any' -г 'value: unknown' болгон өөрчилсөн
   const handleInputChange = (key: string, value: unknown) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSave = async () => {
+    if (!user || !user.uid) {
+      toast.error('Хэрэглэгч нэвтрээгүй байна. Та нэвтэрнэ үү.');
+      return;
+    }
+
     setIsSaving(true); // Хадгалах үйлдэл эхэллээ
     try {
       // Асуултын зургийг R2 руу байршуулах
@@ -69,6 +76,7 @@ export default function TeacherTestPage() {
   
       // Firestore-д хадгалах өгөгдлийг бэлдэнэ
       const questionData = {
+        questionNumber: typeof form.questionNumber === 'string' ? parseInt(form.questionNumber) : form.questionNumber, // Дугаарыг тоо болгож хадгалах
         question: form.question,
         questionImage: questionImageUrl,
         answerType: form.answerType,
@@ -87,6 +95,7 @@ export default function TeacherTestPage() {
         timeLimit: form.timeLimit,
         tableAnswerJson: form.tableAnswerJson || '',
         createdAt: new Date(), // Үүсгэсэн огноог нэмсэн
+        moderatorUid: user.uid, // Нэвтэрсэн модераторын UID-г хадгалах
       };
   
       // Firestore руу хадгалах
@@ -97,6 +106,7 @@ export default function TeacherTestPage() {
       
       // Формыг цэвэрлэх
       setForm({
+        questionNumber: '',
         question: '',
         questionImageFile: null,
         answerType: 'choice-single',
@@ -136,6 +146,15 @@ export default function TeacherTestPage() {
             <CardTitle>Тест оруулах</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <Label htmlFor="questionNumber">Асуултын дугаар</Label>
+            <Input
+              id="questionNumber"
+              type="number"
+              placeholder="Асуултын дугаар"
+              value={form.questionNumber}
+              onChange={(e) => handleInputChange('questionNumber', e.target.value)}
+            />
+
             <Label htmlFor="answerType">Төрөл</Label>
             <Select value={form.answerType} onValueChange={(v) => handleInputChange('answerType', v)}>
               <SelectTrigger id="answerType"><SelectValue placeholder="Тестийн төрөл" /></SelectTrigger>
@@ -284,16 +303,16 @@ export default function TeacherTestPage() {
         <Card>
           <CardHeader><CardTitle>Preview</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
+            <p><b>Асуултын дугаар:</b> {form.questionNumber || '-'}</p>
             <p><b>Асуулт:</b></p>
             <LatexRenderer text={form.question} />
             {form.questionImageFile && (
-              // Image компонент ашигласан
-              <div className="relative w-full h-64"> {/* Эцэг элементийн хэмжээг тохируулсан */}
+              <div className="relative w-full h-64">
                 <Image 
                   src={URL.createObjectURL(form.questionImageFile)} 
                   alt="Асуултын зураг" 
-                  fill // Эцэг элементийн хэмжээг дүүргэнэ
-                  style={{ objectFit: 'contain' }} // Зургийг хайчлахгүйгээр тааруулна
+                  fill
+                  style={{ objectFit: 'contain' }}
                   className="rounded border" 
                 />
               </div>
@@ -303,13 +322,12 @@ export default function TeacherTestPage() {
                 <span>{String.fromCharCode(65 + idx)}.</span>
                 <LatexRenderer text={opt} />
                 {form.imageFiles[idx] && (
-                  // Image компонент ашигласан
-                  <div className="relative w-20 h-20"> {/* Жижиг зургийн хэмжээг тохируулсан */}
+                  <div className="relative w-20 h-20">
                     <Image 
                       src={URL.createObjectURL(form.imageFiles[idx]!)} 
                       alt={`Сонголтын зураг ${idx + 1}`} 
-                      fill // Эцэг элементийн хэмжээг дүүргэнэ
-                      style={{ objectFit: 'contain' }} // Зургийг хайчлахгүйгээр тааруулна
+                      fill
+                      style={{ objectFit: 'contain' }}
                       className="rounded border" 
                     />
                   </div>
@@ -332,13 +350,12 @@ export default function TeacherTestPage() {
               </div>
             )}
             {form.explanationImage && (
-              // Image компонент ашигласан
-              <div className="relative w-full h-64"> {/* Эцэг элементийн хэмжээг тохируулсан */}
+              <div className="relative w-full h-64">
                 <Image 
                   src={URL.createObjectURL(form.explanationImage)} 
                   alt="Бодолтын зураг" 
-                  fill // Эцэг элементийн хэмжээг дүүргэнэ
-                  style={{ objectFit: 'contain' }} // Зургийг хайчлахгүйгээр тааруулна
+                  fill
+                  style={{ objectFit: 'contain' }}
                   className="rounded border" 
                 />
               </div>
@@ -351,6 +368,7 @@ export default function TeacherTestPage() {
             <p><b>Хүндрэл:</b> {form.difficulty || '-'}</p>
             <p><b>Source:</b> {form.source || '-'}</p>
             <p><b>Хугацаа:</b> {form.timeLimit} сек</p>
+            <p><b>Модераторын UID:</b> {user?.uid || '-'}</p> {/* Preview-д модераторын UID-г харуулах */}
           </CardContent>
         </Card>
       </div>
