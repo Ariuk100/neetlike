@@ -9,15 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { getIdToken } from 'firebase/auth'
+import { getIdToken, updateProfile } from 'firebase/auth'
 
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithPopup // Google Sign-In-д попап ашиглаж байна
+  signInWithPopup
 } from 'firebase/auth'
-import { auth, db, googleProvider } from '@/lib/firebase'
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
+import { auth, googleProvider } from '@/lib/firebase'
 
 // Select components import
 import {
@@ -30,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-// Mongolian province and district list
+// Mongolian province and district list (Монгол нэрээрээ байгаа)
 const MONGOLIAN_LOCATIONS = [
   {
     province: 'Улаанбаатар',
@@ -93,116 +92,116 @@ const MONGOLIAN_LOCATIONS = [
     ],
   },
   {
-    province: 'Dornogovi',
+    province: 'Дорноговь',
     districts: [
-      'Ayrag', 'Altanshiree', 'Dalanjargalan', 'Delgerekh', 'Zamyn-Uud', 'Ikhkhet',
-      'Mandakh', 'Orgon', 'Saikhandulaan', 'Sainshand', 'Ulaanbadrakh', 'Khatanbulag',
-      'Khovsgol', 'Erdene'
+      'Айраг', 'Алтанширээ', 'Даланжаргалан', 'Дэлгэрэх', 'Замын-Үүд', 'Иххэт',
+      'Мандах', 'Өргөн', 'Сайхандулаан', 'Сайншанд', 'Улаанбадрах', 'Хатанбулаг',
+      'Хөвсгөл', 'Эрдэнэ'
     ],
   },
   {
-    province: 'Dornod',
+    province: 'Дорнод',
     districts: [
-      'Bayandun', 'Bayantumun', 'Bayan-Uul', 'Bulgan', 'Dashbalbar', 'Gurvanzagal',
-      'Khalkhgol', 'Kholonbuir', 'Matad', 'Sergelen', 'Tsagaan-Ovoo', 'Choibalsan',
-      'Chuluunkhoroot'
+      'Баяндун', 'Баянтүмэн', 'Баян-Уул', 'Булган', 'Дашбалбар', 'Гурванзагал',
+      'Халхгол', 'Хөлөнбуйр', 'Матад', 'Сэргэлэн', 'Цагаан-Овоо', 'Чойбалсан',
+      'Чулуунхороот'
     ],
   },
   {
-    province: 'Dundgovi',
+    province: 'Дундговь',
     districts: [
-      'Adaatsag', 'Bayanjargalan', 'Govi-Ugtaal', 'Gurvansaikhan', 'Delgertsogt', 'Deren',
-      'Luus', 'Ulziit', 'Ondorhil', 'Saintsagaan', 'Khuld', 'Tsagaandelger',
-      'Erdenedalai'
+      'Адаацаг', 'Баянжаргалан', 'Говь-Угтаал', 'Гурвансайхан', 'Дэлгэрцогт', 'Дэрэн',
+      'Луус', 'Өлзийт', 'Өндөршил', 'Сайнцагаан', 'Хулд', 'Цагаандэлгэр',
+      'Эрдэнэдалай'
     ],
   },
   {
-    province: 'Zavkhan',
+    province: 'Завхан',
     districts: [
-      'Aldarkhaan', 'Asgat', 'Bayankhairkhan', 'Bayankhongor', 'Bayantes', 'Dorvoljin',
-      'Ider', 'Ikh-Uul', 'Nomrog', 'Otgon', 'Songino', 'Tosontsengel',
-      'Tudevtei', 'Urgamal', 'Tsagaankhairkhan', 'Tsagaanchuluut', 'Tsetsen-Uul',
-      'Shiluustei', 'Erdenehairkhan', 'Yaruu', 'Uliastai'
+      'Алдархаан', 'Асгат', 'Баянхайрхан', 'Баянхонгор', 'Баянтэс', 'Дөрвөлжин',
+      'Идэр', 'Их-Уул', 'Номрог', 'Отгон', 'Сонгино', 'Тосонцэнгэл',
+      'Түдэвтэй', 'Ургамал', 'Цагаанхайрхан', 'Цагаанчулуут', 'Цэцэн-Уул',
+      'Шилүүстэй', 'Эрдэнэхайрхан', 'Яруу', 'Улиастай'
     ],
   },
   {
-    province: 'Orkhon',
+    province: 'Орхон',
     districts: [
-      'Bayan-Ondor', 'Jargalant'
+      'Баян-Өндөр', 'Жаргалант'
     ],
   },
   {
-    province: 'Ovorkhangai',
+    province: 'Өвөрхангай',
     districts: [
-      'Baruunbayan-Ulaan', 'Bayan-Ondor', 'Bayangol', 'Bayanlig', 'Bat-Ulzii', 'Bogd',
-      'Burd', 'Guchin-Us', 'Yosonzul', 'Khairkhandulaan', 'Kharkhorin', 'Khujirt',
-      'Nariinteel', 'Ulziit', 'Sankt', 'Taragt', 'Togrog', 'Uyanga',
-      'Zunbayan-Ulaan', 'Arvaikheer'
+      'Баруунбаян-Улаан', 'Баян-Өндөр', 'Баянгол', 'Баянлиг', 'Бат-Өлзий', 'Богд',
+      'Бурд', 'Гучин-Ус', 'Есөнзүйл', 'Хайрхандулаан', 'Хархорин', 'Хужирт',
+      'Нарийнтээл', 'Өлзийт', 'Санкт', 'Тарагт', 'Төгрөг', 'Уянга',
+      'Зүүнбаян-Улаан', 'Арвайхээр'
     ],
   },
   {
-    province: 'Omnogovi',
+    province: 'Өмнөговь',
     districts: [
-      'Bayan-Ovoo', 'Bayandalai', 'Bulgan', 'Gurvantes', 'Dalanzadgad', 'Khanbogd',
-      'Khanhongor', 'Manlai', 'Nomgon', 'Noyon', 'Sevrey', 'Tsogt-Ovoo',
-      'Tsogttsetii'
+      'Баян-Овоо', 'Баяндалай', 'Булган', 'Гурвантэс', 'Даланзадгад', 'Ханбогд',
+      'Ханхонгор', 'Манлай', 'Номгон', 'Ноён', 'Сэврэй', 'Цогт-Овоо',
+      'Цогтцэций'
     ],
   },
   {
-    province: 'Selenge',
+    province: 'Сэлэнгэ',
     districts: [
-      'Altanbulag', 'Baruunburen', 'Bayangol', 'Yeroo', 'Javkhlant', 'Zunburen',
-      'Mandal', 'Orkhontuul', 'Sant', 'Saikhan', 'Sukhbaatar', 'Tushig',
-      'Khushaat', 'Tsagaannuur', 'Shaamar'
+      'Алтанбулаг', 'Баруунбүрэн', 'Баянгол', 'Ерөө', 'Жавхлант', 'Зүүнбүрэн',
+      'Мандал', 'Орхонтуул', 'Сант', 'Сайхан', 'Сүхбаатар', 'Түшиг',
+      'Хушаат', 'Цагааннуур', 'Шаамар'
     ],
   },
   {
-    province: 'Sukhbaatar',
+    province: 'Сүхбаатар',
     districts: [
-      'Asgat', 'Baruun-Urt', 'Bayandelger', 'Dariganga', 'Monkhkhaan', 'Naran',
-      'Ongon', 'Sukhbaatar', 'Tumentsogt', 'Uulbayan', 'Khalzan', 'Erdenetsagaan'
+      'Асгат', 'Баруун-Урт', 'Баяндэлгэр', 'Дарьганга', 'Мөнххаан', 'Наран',
+      'Онгон', 'Сүхбаатар', 'Түмэнцогт', 'Уулбаян', 'Халзан', 'Эрдэнэцагаан'
     ],
   },
   {
-    province: 'Tuv',
+    province: 'Төв',
     districts: [
-      'Altanbulag', 'Argalant', 'Bayan', 'Bayanbaraat', 'Bayanjargalan', 'Bayantsagaan',
-      'Bayankhangai', 'Bayantsogt', 'Bornuur', 'Batsumber', 'Buren', 'Delgerkhaan',
-      'Erdene', 'Jargalant', 'Zaamar', 'Lun', 'Mongonmorit', 'Ondorshireet',
-      'Sergelen', 'Sumber', 'Tseel', 'Ugtaaltsaidam', 'Erdenesan', 'Zunmod'
+      'Алтанбулаг', 'Аргалант', 'Баян', 'Баянбараат', 'Баянжаргалан', 'Баянцагаан',
+      'Баянхангай', 'Баянцогт', 'Борнуур', 'Батсүмбэр', 'Бүрэн', 'Дэлгэрхаан',
+      'Эрдэнэ', 'Жаргалант', 'Заамар', 'Лүн', 'Мөнгөнморьт', 'Өндөрширээт',
+      'Сэргэлэн', 'Сүмбэр', 'Цээл', 'Угтаалцайдам', 'Эрдэнэсант', 'Зуунмод'
     ],
   },
   {
-    province: 'Uvs',
+    province: 'Увс',
     districts: [
-      'Baruunturuun', 'Bokhmoron', 'Davst', 'Zavkhan', 'Zungovi', 'Zunkhangai',
-      'Malchin', 'Naranbulag', 'Omnogovi', 'Ulgi', 'Sagil', 'Tarialan',
-      'Tes', 'Turgen', 'Ulaangom', 'Khovd', 'Khyrgas'
+      'Баруунтуруун', 'Бөхмөрөн', 'Давст', 'Завхан', 'Зүүнговь', 'Зүүнхангай',
+      'Малчин', 'Наранбулаг', 'Өмнөговь', 'Өлгий', 'Сагил', 'Тариалан',
+      'Тэс', 'Түргэн', 'Улаангом', 'Ховд', 'Хяргас'
     ],
   },
   {
-    province: 'Khovd',
+    province: 'Ховд',
     districts: [
-      'Altai', 'Bulgan', 'Buyant', 'Darvi', 'Dorgon', 'Duut',
-      'Zereg', 'Mankhan', 'Monkhkhairkhan', 'Most', 'Myangad', 'Uyenchi',
-      'Khovd', 'Tsetseg', 'Chandmani', 'Erdeneburen'
+      'Алтай', 'Булган', 'Буянт', 'Дарви', 'Дөргөн', 'Дуут',
+      'Зэрэг', 'Манхан', 'Мөнххайрхан', 'Мөст', 'Мянгад', 'Үенч',
+      'Ховд', 'Цэцэг', 'Чандмань', 'Эрдэнэбүрэн'
     ],
   },
   {
-    province: 'Khovsgol',
+    province: 'Хөвсгөл',
     districts: [
-      'Alag-Erdene', 'Arbulag', 'Bayanzurkh', 'Burentogtokh', 'Galt', 'Jargalant',
-      'Ikh-Uul', 'Moron', 'Rashant', 'Renchinlkhumbe', 'Tarialan', 'Tosontsengel',
-      'Tomorbulag', 'Tunel', 'Ulaan-Uul', 'Khanh', 'Tsagaan-Uul', 'Tsagaannuur',
-      'Tsagaan-Uur', 'Tsetserleg', 'Chandmani-Ondor', 'Erdenebulgan'
+      'Алаг-Эрдэнэ', 'Арбулаг', 'Баянзүрх', 'Бүрэнтогтох', 'Галт', 'Жаргалант',
+      'Их-Уул', 'Мөрөн', 'Рашаант', 'Рэнчинлхүмбэ', 'Тариалан', 'Тосонцэнгэл',
+      'Төмөрбулаг', 'Түнэл', 'Улаан-Уул', 'Ханх', 'Цагаан-Уул', 'Цагааннуур',
+      'Цагаан-Үүр', 'Цэцэрлэг', 'Чандмань-Өндөр', 'Эрдэнэбулган'
     ],
   },
   {
-    province: 'Khentii',
+    province: 'Хэнтий',
     districts: [
-      'Batnorov', 'Batshireet', 'Bayan-Ovoo', 'Bayanmonkh', 'Bayankhutag', 'Binder',
-      'Dadal', 'Darkhan', 'Delgerkhaan', 'Jargaltkhaan', 'Omondelger', 'Kherlen',
-      'Tsenkhermandal'
+      'Батноров', 'Батширээт', 'Баян-Овоо', 'Баянмөнх', 'Баянхутаг', 'Биндэр',
+      'Дадал', 'Дархан', 'Дэлгэрхаан', 'Жаргалтхаан', 'Өмнөдэлгэр', 'Хэрлэн',
+      'Цэнхэрмандал'
     ],
   },
 ];
@@ -215,19 +214,18 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [lastName, setLastName] = useState('') // New state for last name
+  const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [school, setSchool] = useState('')
   const [grade, setGrade] = useState('')
-  const [birthYear, setBirthYear] = useState<string>('') // New state for birth year
-  const [gender, setGender] = useState<string>('') // New state for gender
-  const [province, setProvince] = useState<string>('') // New state for province
-  const [district, setDistrict] = useState<string>('') // New state for district
+  const [birthYear, setBirthYear] = useState<string>('')
+  const [gender, setGender] = useState<string>('')
+  const [province, setProvince] = useState<string>('')
+  const [district, setDistrict] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [fadeOut, setFadeOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Хэрэглэгчийн үүрэгт тохирсон зам руу чиглүүлэх туслах функц
   const redirectToRolePage = (role: string) => {
     let redirectPath = '/unauthorized';
     switch (role) {
@@ -254,48 +252,42 @@ export default function AuthPage() {
   };
 
   useEffect(() => {
-    // Firebase тохиргоог лог хийх (өмнө нь нэмэгдсэн)
-    console.log('Client-side Firebase Config:');
-    console.log('NEXT_PUBLIC_FIREBASE_API_KEY:', process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-    console.log('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
-    console.log('NEXT_PUBLIC_FIREBASE_PROJECT_ID:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
-    // ... бусад тохиргоо
+    // Debugging logs - enable if needed for troubleshooting Firebase config or cookie
+    // console.log('Client-side Firebase Config:');
+    // console.log('NEXT_PUBLIC_FIREBASE_API_KEY:', process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+    // console.log('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+    // console.log('NEXT_PUBLIC_FIREBASE_PROJECT_ID:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
 
-    // Нэвтэрсний дараа user_role кукиг шалгах (нэмэлт дибаг лог)
-    const checkRoleCookie = () => {
-      const cookies = document.cookie.split(';');
-      let userRoleCookie = null;
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.startsWith('user_role=')) {
-          userRoleCookie = cookie.substring('user_role='.length, cookie.length);
-          break;
-        }
-      }
-      console.log('Client-side user_role cookie after page load:', userRoleCookie);
-    };
-
-    // Куки шинэчлэгдэхийг түр хүлээгээд шалгана
-    setTimeout(checkRoleCookie, 1000);
+    // const checkRoleCookie = () => {
+    //   const cookies = document.cookie.split(';');
+    //   let userRoleCookie = null;
+    //   for (let i = 0; i < cookies.length; i++) {
+    //     const cookie = cookies[i].trim();
+    //     if (cookie.startsWith('user_role=')) {
+    //       userRoleCookie = cookie.substring('user_role='.length, cookie.length);
+    //       break;
+    //     }
+    //   }
+    //   console.log('Client-side user_role cookie after page load:', userRoleCookie);
+    // };
+    // setTimeout(checkRoleCookie, 1000);
   }, []);
 
   const handleLogin = async () => {
     setLoading(true);
-    setError(null); // Өмнөх алдаануудыг арилгах
+    setError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Хэрэглэгчийн объект болон ID Token-ийг лог хийх (Имэйл/Нууц үгээр нэвтрэх)
       console.log('User object after sign-in (Email/Password):', user);
-      const idToken = await getIdToken(user);
+      const idToken = await getIdToken(user, true); // true for force refresh
       console.log('ID Token after sign-in (Email/Password):', idToken);
 
-      // Сешн куки үүсгэхээр `/api/login` руу дуудна
-      const apiLoginResponse = await fetch('/api/login', { // Энд /api/login-г дуудаж байна
+      const apiLoginResponse = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: idToken }), // token-г idToken болгож өөрчилсөн
+        body: JSON.stringify({ token: idToken }),
       });
 
       if (!apiLoginResponse.ok) {
@@ -303,12 +295,11 @@ export default function AuthPage() {
         throw new Error(errorData.error || 'Сервер дээр сешн куки тохируулахад алдаа гарлаа.');
       }
 
-      // `/api/login` API-аас ирсэн хариултаас үүргийг шууд авна
       const responseData = await apiLoginResponse.json() as { success: boolean; uid: string; role: string; };
       console.log('Login successful, role received:', responseData.role);
 
       toast.success('Амжилттай нэвтэрлээ!');
-      redirectToRolePage(responseData.role); // Үүрэгт тохирсон хуудас руу чиглүүлнэ
+      redirectToRolePage(responseData.role);
 
     } catch (error: unknown) {
       const err = error as { code?: string; message: string };
@@ -320,7 +311,7 @@ export default function AuthPage() {
         case 'auth/invalid-credential': message = 'Нэвтрэх мэдээлэл буруу эсвэл хүчингүй байна.'; break;
         default: message = `Алдаа: ${err.message}`;
       }
-      setError(message); // Алдааг төлөвт хадгалах
+      setError(message);
       toast.error(message);
     } finally {
       setLoading(false);
@@ -329,79 +320,54 @@ export default function AuthPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setError(null); // Өмнөх алдаануудыг арилгах
+    setError(null);
     try {
-      // 🔴 ЭНД ПОПАПТАЙ ХОЛБООТОЙ АЛДААНУУД ГАРЧ БАЙНА:
-      // Firebase: Error (auth/cancelled-popup-request).
-      // Firebase: Error (auth/popup-blocked).
-      // Cross-Origin-Opener-Policy policy would block the window.closed call.
-      // INTERNAL ASSERTION FAILED: Pending promise was never set
-      //
-      // Эдгээр алдаанууд нь ихээвчлэн вэб хөтчийн попап блоклогч,
-      // эсвэл Cross-Origin-Opener-Policy (COOP) зэрэг аюулгүй байдлын бодлогоос үүсдэг.
-      // Мөн хэрэглэгч попапыг хурдан хаах үед ч гарч болно.
-      //
-      // ХАМГИЙН НАЙДВАРТАЙ ШИЙДЭЛ: signInWithRedirect ашиглах.
-      // signInWithRedirect нь попап цонх ашиглахгүйгээр хэрэглэгчийг Google-ийн нэвтрэх хуудас руу
-      // чиглүүлж, нэвтэрсний дараа таны аппликешн руу буцаадаг.
-      // Энэ нь попап блоклогч болон COOP-той холбоотой асуудлуудыг шийддэг.
-      //
-      // Таны хүсэлтээр "өөр өөрчлөлт хийж болохгүй" гэсэн тул, би signInWithPopup-ийг
-      // эндээс шууд өөрчлөхгүй байна. Гэхдээ ирээдүйд энэ асуудлыг бүрэн шийдэхийн тулд
-      // signInWithRedirect-ийг ашиглахыг зөвлөж байна.
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      const idToken = await user.getIdToken(); // Энэ нь одоо шинэ Custom Claim-тай байх ёстой
 
-      // Хэрэглэгчийн объект болон ID Token-ийг лог хийх (Google-ээр нэвтрэх)
+      if (user.displayName && !user.photoURL) {
+        await updateProfile(user, { displayName: user.displayName });
+      }
+
+      const idToken = await getIdToken(user, true);
       console.log('User object after sign-in (Google):', user);
       console.log('ID Token after sign-in (Google):', idToken);
 
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // Хэрэв шинэ Google хэрэглэгч бол Firestore-д бүртгэнэ
-        let newReadableId = 'S0001'; // Эхний ID
-        // ЭНГИЙН ЖИШЭЭ: Хамгийн сүүлийн сурагчийн ID-г авах (олон хэрэглэгч зэрэг бүртгүүлэх үед race condition үүсэх магадлалтай!)
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, orderBy('createdAt', 'desc'), limit(1));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const lastUser = querySnapshot.docs[0].data();
-          const lastId = lastUser.readableId;
-          if (lastId && lastId.startsWith('S') && lastId.length === 5) {
-            const num = parseInt(lastId.substring(1)) + 1;
-            newReadableId = 'S' + String(num).padStart(4, '0');
-          }
-        }
-
-        await setDoc(userRef, {
+      // Google-ээр нэвтэрсэн хэрэглэгчийн мэдээллийг сервер талын API руу илгээх
+      const registerProfileResponse = await fetch('/api/register-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           uid: user.uid,
-          name: user.displayName || '',
-          lastName: '', // Google-ээр нэвтрэхэд овог хоосон байна
-          phone: '',
-          email: user.email || '',
-          role: 'student', // Анхдагч үүрэг 'student'
-          school: '',
-          grade: '',
-          birthYear: '', // Google-ээр нэвтрэхэд төрсөн он хоосон байна
-          gender: '', // Google-ээр нэвтрэхэд хүйс хоосон байна
-          province: '', // Google-ээр нэвтрэхэд аймаг хоосон байна
-          district: '', // Google-ээр нэвтрэхэд сум хоосон байна
-          readableId: newReadableId, // Шинээр үүсгэсэн ID-г хадгалах
-          createdAt: new Date(), // Үүсгэсэн огноог нэмэх
-        });
-      }
+          email: user.email,
+          profileData: {
+            name: user.displayName || user.email?.split('@')[0] || '',
+            lastName: '', // Google-ээр ирэхгүй тул хоосон
+            phone: '',    // Google-ээр ирэхгүй тул хоосон
+            school: '',   // Google-ээр ирэхгүй тул хоосон
+            grade: '',    // Google-ээр ирэхгүй тул хоосон
+            birthYear: null, // Google-ээр ирэхгүй тул null
+            gender: '',   // Google-ээр ирэхгүй тул хоосон
+            province: '', // Google-ээр ирэхгүй тул хоосон
+            district: '', // Google-ээр ирэхгүй тул хоосон
+            // readableId болон createdAt-г сервер тал үүсгэнэ
+          }
+        })
+      });
 
-      // Сешн куки үүсгэхээр API руу дуудна
-      const apiLoginResponse = await fetch('/api/login', { // Энд /api/login-г дуудаж байна
+      if (!registerProfileResponse.ok) {
+        const errorData = await registerProfileResponse.json();
+        throw new Error(errorData.error || 'Google бүртгэлийн профайл үүсгэхэд алдаа гарлаа.');
+      }
+      console.log('✅ Server: Google user profile successfully sent to Firestore via API.');
+
+
+      const apiLoginResponse = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token: idToken }), // token-г idToken болгож өөрчилсөн
+        body: JSON.stringify({ token: idToken }),
       });
 
       if (!apiLoginResponse.ok) {
@@ -409,17 +375,15 @@ export default function AuthPage() {
         throw new Error(errorData.error || 'Google нэвтрэлт амжилтгүй боллоо.');
       }
 
-      // `/api/login` API-аас ирсэн хариултаас үүргийг шууд авна
       const responseData = await apiLoginResponse.json() as { success: boolean; uid: string; role: string; };
-      console.log('Login successful:', responseData);
+      console.log('Google login successful, role received:', responseData.role);
 
       toast.success('Google-ээр амжилттай нэвтэрлээ!');
-      redirectToRolePage(responseData.role); // Үүрэгт тохирсон хуудас руу чиглүүлнэ
+      redirectToRolePage(responseData.role);
 
     } catch (error: unknown) {
       const err = error as { code?: string; message: string };
       console.error('Google Sign-In Error:', err);
-      // auth/popup-blocked, auth/cancelled-popup-request зэрэг алдааг хэрэглэгчид харуулах
       let displayMessage = 'Google нэвтрэлт амжилтгүй боллоо.';
       if (err.code === 'auth/popup-blocked') {
         displayMessage = 'Попап цонх хаагдсан байна. Вэб хөтчийнхөө тохиргоог шалгана уу.';
@@ -436,104 +400,124 @@ export default function AuthPage() {
   };
 
   const handleRegister = async () => {
-    if (!/^[\d]{8}$/.test(phone)) {
-      toast.error('Утасны дугаар 8 оронтой байх ёстой!');
+    const trimmedPhone = phone.trim()
+    const trimmedEmail = email.trim()
+    const trimmedName = name.trim()
+    const trimmedLastName = lastName.trim()
+    const trimmedSchool = school.trim()
+    const trimmedGrade = grade.trim()
+  
+    if (!/^[5-9]\d{7}$/.test(trimmedPhone)) {
+      toast.error('Утасны дугаар буруу байна. 8 оронтой, 5, 6, 7, 8, эсвэл 9-өөр эхэлнэ.');
       return;
     }
-    if (!email.includes('@') || !email.includes('.')) {
+  
+    if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
       toast.error('И-мэйл хаяг буруу байна!');
       return;
     }
-    // Шинэ талбаруудыг баталгаажуулах
-    if (!lastName || !birthYear || !gender || !province || !district) {
-      toast.error('Бүх талбарыг бөглөнө үү!');
+    
+    if (password.length < 6) {
+      toast.error('Нууц үг доод тал нь 6 тэмдэгтээс бүрдсэн байна.');
       return;
     }
-
-    setLoading(true);
-    setError(null); // Өмнөх алдаануудыг арилгах
+  
+    if (!trimmedName || !trimmedLastName || !birthYear || !gender || !province || !district || !trimmedSchool || !trimmedGrade) {
+      toast.error('Бүх шаардлагатай талбарыг бөглөнө үү!');
+      return;
+    }
+  
+    setLoading(true)
+    setError(null)
+  
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      console.log('User object after registration:', user);
-      const idToken = await getIdToken(user);
-      console.log('ID Token after registration:', idToken);
-
-      let newReadableId = 'S0001'; // Эхний ID
-      // ЭНГИЙН ЖИШЭЭ: Хамгийн сүүлийн сурагчийн ID-г авах
-      // Олон хэрэглэгч зэрэг бүртгүүлэх үед race condition үүсэх магадлалтайг анхаарна уу!
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('createdAt', 'desc'), limit(1)); // Хамгийн сүүлд үүсгэгдсэн хэрэглэгчийг авах
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const lastUser = querySnapshot.docs[0].data();
-        const lastId = lastUser.readableId; // Жишээ: "S0001"
-        if (lastId && lastId.startsWith('S') && lastId.length === 5) {
-          const num = parseInt(lastId.substring(1)) + 1;
-          newReadableId = 'S' + String(num).padStart(4, '0');
-        }
-      }
-
-      await setDoc(doc(db, 'users', user.uid), {
+      const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password)
+      const user = userCredential.user
+  
+      console.log('🔥 Registration form data prepared for API:', {
         uid: user.uid,
-        name,
-        lastName, // Шинэ талбар
-        phone,
-        email,
-        role: 'student', // Бүртгүүлэх үед анхдагч үүрэг 'student'
-        school,
-        grade,
-        birthYear: parseInt(birthYear), // Шинэ талбар, тоо хэлбэрээр хадгалах
-        gender, // Шинэ талбар
-        province, // Шинэ талбар
-        district, // Шинэ талбар
-        readableId: newReadableId, // Шинээр үүсгэсэн ID-г хадгалах
-        createdAt: new Date(), // Үүсгэсэн огноог нэмэх, дараалсан ID үүсгэхэд ашигтай
+        email: trimmedEmail,
+        profileData: { // API руу илгээх профайл мэдээлэл
+          name: trimmedName,
+          lastName: trimmedLastName,
+          phone: trimmedPhone,
+          school: trimmedSchool,
+          grade: trimmedGrade,
+          birthYear: birthYear ? parseInt(birthYear) : null,
+          gender: gender,
+          province: province,
+          district: district,
+        }
       });
-
-      // Бүртгүүлсний дараа нэвтэрсэн гэж үзээд сешн кукиг тохируулах
-      const apiLoginResponse = await fetch('/api/login', { // Энд /api/login-г дуудаж байна
+      
+      // Сервер талын API руу бүртгэлийн мэдээллийг илгээх
+      const registerProfileResponse = await fetch('/api/register-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: idToken }), // token-г idToken болгож өөрчилсөн
+        body: JSON.stringify({
+          uid: user.uid,
+          email: trimmedEmail,
+          profileData: {
+            name: trimmedName,
+            lastName: trimmedLastName,
+            phone: trimmedPhone,
+            school: trimmedSchool,
+            grade: trimmedGrade,
+            birthYear: birthYear ? parseInt(birthYear) : null,
+            gender: gender,
+            province: province,
+            district: district,
+            // readableId болон createdAt-г сервер тал үүсгэнэ
+          }
+        })
       });
-
-      if (!apiLoginResponse.ok) {
-        const errorData = await apiLoginResponse.json() as { error?: string };
-        throw new Error(errorData.error || 'Бүртгүүлсний дараа сешн куки тохируулахад алдаа гарлаа.');
+  
+      if (!registerProfileResponse.ok) {
+        const errorData = await registerProfileResponse.json()
+        throw new Error(errorData.error || 'Бүртгэлийн профайл үүсгэхэд алдаа гарлаа.')
       }
+      console.log('✅ Server: User profile successfully sent to Firestore via API.');
+  
+      // Одоо API /api/login руу дуудах шаардлагагүй, учир нь бүртгүүлсний дараа шууд нэвтрэхгүй.
+      // Зөвхөн хэрэглэгчийг нэвтрэх хуудас руу шилжүүлнэ.
+      // const apiLoginResponse = await fetch('/api/login', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ token: idToken })
+      // })
+      // if (!apiLoginResponse.ok) {
+      //   const errorData = await apiLoginResponse.json()
+      //   throw new Error(errorData.error || 'Сешн куки тохируулахад алдаа гарлаа.')
+      // }
+      // const responseData = await apiLoginResponse.json()
 
-      // `/api/login` API-аас ирсэн хариултаас үүргийг шууд авна
-      const responseData = await apiLoginResponse.json() as { success: boolean; uid: string; role: string; };
-      console.log('Registration successful, role received:', responseData.role);
-
-      toast.success('Бүртгэл амжилттай үүслээ!');
-      redirectToRolePage(responseData.role); // Үүрэгт тохирсон хуудас руу чиглүүлнэ
+      toast.success('Бүртгэл амжилттай үүслээ! Одоо нэвтэрнэ үү.');
+      
+      // И-мэйлийг автоматаар бөглөөд, логин таб руу шилжүүлэх
+      setEmail(trimmedEmail); // Бүртгүүлсэн и-мэйлийг логин талбарт автоматаар бөглөх
+      setPassword(''); // Нууц үгийг цэвэрлэх (дахин оруулах шаардлагатай)
+      setTab('login'); // Логин таб руу шилжүүлэх
 
     } catch (error: unknown) {
-      const err = error as { code?: string; message: string };
-      let message = 'Бүртгэхэд алдаа гарлаа.';
+      const err = error as { code?: string; message: string }
+      let message = 'Бүртгэхэд алдаа гарлаа.'
       switch (err.code) {
-        case 'auth/email-already-in-use': message = 'Энэ и-мэйл аль хэдийн бүртгэгдсэн байна.'; break;
-        case 'auth/invalid-email': message = 'И-мэйл хаяг буруу байна.'; break;
-        case 'auth/weak-password': message = 'Нууц үг хэт сул байна. Доод тал нь 6 тэмдэгт.'; break;
-        case 'auth/missing-password': message = 'Нууц үгээ оруулна уу.'; break;
-        default: message = `Алдаа: ${err.message}`;
+        case 'auth/email-already-in-use': message = 'Энэ и-мэйл аль хэдийн бүртгэгдсэн байна.'; break
+        case 'auth/invalid-email': message = 'И-мэйл хаяг буруу байна.'; break
+        case 'auth/weak-password': message = 'Нууц үг хэт сул байна. Доод тал нь 6 тэмдэгт.'; break
+        case 'auth/missing-password': message = 'Нууц үгээ оруулна уу.'; break
+        default: message = `Алдаа: ${err.message}`
       }
-      setError(message); // Алдааг төлөвт хадгалах
-      toast.error(message);
+      setError(message)
+      toast.error(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Төрсөн оны сонголтуудыг үүсгэх
   const currentYear = new Date().getFullYear();
-  const birthYears = Array.from({ length: 100 }, (_, i) => (currentYear - 90 + i).toString()); // 90 жилийн өмнөөс одоогийн жил хүртэл
+  const birthYears = Array.from({ length: 90 }, (_, i) => (currentYear - 17 - i).toString());
 
-  // Сонгосон аймгийн сум/дүүргийг авах
   const selectedProvinceData = MONGOLIAN_LOCATIONS.find(loc => loc.province === province);
   const districtsForSelectedProvince = selectedProvinceData ? selectedProvinceData.districts : [];
 
@@ -582,7 +566,7 @@ export default function AuthPage() {
             <TabsContent value="register">
               <div className="space-y-4">
                 <div><Label>Нэр</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-                <div><Label>Овог</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div> {/* New field */}
+                <div><Label>Овог</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
                 <div><Label>Утас</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
                 <div><Label>Имэйл</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
                 <div><Label>Нууц үг</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
@@ -629,7 +613,7 @@ export default function AuthPage() {
                   <Label>Аймаг/Хот</Label>
                   <Select value={province} onValueChange={(value) => {
                     setProvince(value);
-                    setDistrict(''); // Аймаг өөрчлөгдөхөд сум/дүүргийг цэвэрлэх
+                    setDistrict(''); // Аймаг өөрчлөгдөхөд сум/дүүргэнийг цэвэрлэх
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Аймаг/Хотоо сонгоно уу" />

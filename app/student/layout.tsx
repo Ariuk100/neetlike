@@ -1,11 +1,14 @@
 // app/student/layout.tsx
-'use client'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { adminAuth } from '@/lib/firebaseAdmin'
 
-// 🔴 Устгах: useAuthRedirect-ийн импорт
-// import { useAuthRedirect } from '@/lib/hooks/useAuthRedirect'
+export default async function StudentLayout({ children }: { children: React.ReactNode }) {
+  const sessionCookie = (await cookies()).get('__session')?.value
+  if (!sessionCookie) redirect('/auth')
 
-export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  // 🔴 Устгах: useAuthRedirect-ийн дуудлага
-  // useAuthRedirect()
+  const decoded = await adminAuth.verifySessionCookie(sessionCookie, true)
+  if (decoded.role !== 'student') redirect('/unauthorized')
+
   return <>{children}</>
 }

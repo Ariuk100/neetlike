@@ -1,13 +1,13 @@
-// app/student/layout.tsx
-'use client'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { adminAuth } from '@/lib/firebaseAdmin'
 
-// 🔴 Устгах: useAuthRedirect-ийн импорт
-// import { useAuthRedirect } from '@/lib/hooks/useAuthRedirect'
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const sessionCookie = (await cookies()).get('__session')?.value
+  if (!sessionCookie) redirect('/auth')
 
-// Файлын нэр нь student-тэй холбоотой тул StudentLayout гэж нэрлэсэн.
-// Хэрэв таны жинхэнэ файлын нэр AdminLayout хэвээрээ байвал, түүнийг StudentLayout болгож өөрчлөх нь зүйтэй.
-export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  // 🔴 Устгах: useAuthRedirect-ийн дуудлага
-  // useAuthRedirect()
+  const decoded = await adminAuth.verifySessionCookie(sessionCookie, true)
+  if (decoded.role !== 'admin') redirect('/unauthorized')
+
   return <>{children}</>
 }

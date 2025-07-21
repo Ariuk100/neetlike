@@ -1,65 +1,58 @@
+// functions/src/index.ts
+import { auth } from "firebase-functions/v1"; // v1 auth-г импортлоно
+import * as admin from "firebase-admin";
+import { UserRecord } from 'firebase-admin/auth'; // UserRecord-ийн төрлийг импортлоно
 
-    import * as functions from 'firebase-functions/v1'; 
-    import * as admin from 'firebase-admin';
+// Firebase Admin SDK-г эхлүүлнэ
+admin.initializeApp();
 
+// Firestore Reference for storing the last readable ID (or a counter)
+const countersDocRef = admin.firestore().collection('metadata').doc('counters');
 
-    if (!admin.apps.length) {
-      admin.initializeApp();
-    }
+// Firebase Authentication-д шинэ хэрэглэгч бүртгэгдэх үед ажиллана
+export const setStudentRoleAndReadableId = auth.user().onCreate(async (user: UserRecord) => {
+  const firestore = admin.firestore(); // Firestore instance-г авах
 
+  let finalReadableId: number;
 
-    const db = admin.firestore();
+  try {
+    // 1. Readable ID-г Transaction ашиглан нэгээр нэмэгдүүлж, Firestore дээрх user document-д хадгалах
+    await firestore.runTransaction(async (transaction) => {
+      const countersDoc = await transaction.get(countersDocRef);
 
-    export const assignReadableIdOnUserCreate = functions.auth.user().onCreate(async (user: functions.auth.UserRecord) => {
-
-      if (!user || !user.uid) {
-        console.error('Cloud Function: User object is undefined or missing UID.');
-        return null; // Алдааг бүртгээд функцийг дуусгана
+      let currentId = 0;
+      if (countersDoc.exists) {
+        currentId = (countersDoc.data()?.nextReadableId as number) || 0;
       }
+      finalReadableId = currentId + 1;
 
-      const userId = user.uid;
-      const userEmail = user.email || ''; // Email байхгүй байж болно
-      const userName = user.displayName || ''; // DisplayName байхгүй байж болно
+      // Тоолуурыг шинэчилнэ
+      transaction.set(countersDocRef, { nextReadableId: finalReadableId });
 
-      
-      console.log(`New user created in Auth: ${userId}, Email: ${userEmail}`);
+      // Firestore дээр хэрэглэгчийн баримтыг үүсгэх эсвэл шинэчлэх
+      const userDocRef = firestore.collection('users').doc(user.uid);
+      transaction.set(userDocRef, {
+        uid: user.uid,
+        email: user.email || null,
+        role: "student", // ✅ Role-г энд онооно
+        readableId: finalReadableId, // ✅ ReadableId-г энд онооно
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        // 🔴 ЭНДЭЭС name, lastName, phone, school, grade, gender, birthYear, province, district-г ХАСАХ ёстой!
+        // Эдгээрийг /api/register-profile API хариуцна.
+      }, { merge: true }); // merge: true нь одоо байгаа талбаруудыг дарж бичихгүй
 
-      try {
-        const usersRef = db.collection('users');
-        const lastUserQuery = usersRef.orderBy('createdAt', 'desc').limit(1); // 'createdAt'-аар эрэмбэлж, хамгийн сүүлийнхийг авна
-        const querySnapshot = await lastUserQuery.get();
-
-        let newReadableId = 'S0001'; // Анхны readableId (хэрэв хэрэглэгч байхгүй бол)
-
-        if (!querySnapshot.empty) {
-          const lastUserDoc = querySnapshot.docs[0];
-          const lastUserData = lastUserDoc.data();
-          const lastReadableId = lastUserData.readableId; // Хамгийн сүүлийн хэрэглэгчийн readableId-г авна
-
-          // ReadableId-г парс хийж, дараагийн дугаарыг үүсгэх
-          if (lastReadableId && typeof lastReadableId === 'string' && lastReadableId.startsWith('S') && lastReadableId.length === 5) {
-            const numPart = parseInt(lastReadableId.substring(1), 10); // 'S' үсгийг хасаад тоог авна
-            if (!isNaN(numPart)) { // Тоо зөв эсэхийг шалгана
-              newReadableId = 'S' + String(numPart + 1).padStart(4, '0'); // Дараагийн тоог үүсгэж, 4 оронтой болгоно
-            }
-          }
-        }
-
-        await usersRef.doc(userId).set({
-          uid: userId,
-          email: userEmail,
-          name: userName, // Google-ээр нэвтэрсэн бол displayName-г ашиглана
-          role: 'student', // Шинэ хэрэглэгчдэд анхдагч үүргийг 'student' гэж өгнө
-          createdAt: admin.firestore.FieldValue.serverTimestamp(), // Сервер талын цагийг ашиглана
-          readableId: newReadableId, // Үүсгэсэн readableId-г нэмнэ
-   
-        }, { merge: true });
-
-        console.log(`Assigned readableId ${newReadableId} to user ${userId}`);
-        return null; 
-      } catch (error) {
-        console.error(`Error assigning readableId to user ${userId}:`, error);
-        return null; 
-      }
+      console.log(`✅ Transaction completed for user: ${user.uid} with readableId: ${finalReadableId}`);
     });
-    
+
+    // 2. Custom Claims-д зөвхөн "student" role-г оноох
+    const existingClaims = (await admin.auth().getUser(user.uid)).customClaims || {};
+    await admin.auth().setCustomUserClaims(user.uid, {
+      ...existingClaims,
+      role: "student",
+    });
+    console.log(`✅ Custom claims updated for user: ${user.uid} with only role.`);
+
+  } catch (error) {
+    console.error(`❌ Error processing user creation for ${user.uid}:`, error);
+  }
+});

@@ -1,12 +1,14 @@
-// app/admin/layout.tsx
-'use client'
+// app/teacher/layout.tsx
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { adminAuth } from '@/lib/firebaseAdmin'
 
-// 🔴 Устгах: useAuthRedirect-ийн импорт
-// import { useAuthRedirect } from '@/lib/hooks/useAuthRedirect'
+export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
+  const sessionCookie = (await cookies()).get('__session')?.value
+  if (!sessionCookie) redirect('/auth')
 
-// Компонентын нэрийг AdminLayout болгож өөрчилсөн.
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  // 🔴 Устгах: useAuthRedirect-ийн дуудлага
-  // useAuthRedirect()
+  const decoded = await adminAuth.verifySessionCookie(sessionCookie, true)
+  if (decoded.role !== 'teacher') redirect('/unauthorized')
+
   return <>{children}</>
 }

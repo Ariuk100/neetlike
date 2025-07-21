@@ -241,9 +241,17 @@ useEffect(() => {
       )}
     </button>
 
-    {/* 👇 Хэрэглэгчийн нэр болон роль */}
+    {/* 👇 Хэрэглэгчийн нэр, роль, болон readableId */}
     <div className="flex flex-col text-sm leading-tight text-right">
-      <span className="font-semibold text-gray-800">{user.name}</span>
+      <span className="font-semibold text-gray-800">
+        {user.name}
+        {/* readableId-г нэрний хажууд жижиг хэмжээтэй харуулах */}
+        {user.readableId && (
+          <span className="ml-2 text-xs text-gray-500 font-normal">
+            (ID: {user.readableId})
+          </span>
+        )}
+      </span>
       <span className="text-gray-500 capitalize">{user.role}</span>
     </div>
 
