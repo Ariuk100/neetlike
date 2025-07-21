@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { getIdToken, updateProfile } from 'firebase/auth'
+import { getIdToken, updateProfile, sendPasswordResetEmail } from 'firebase/auth' // sendPasswordResetEmail нэмсэн
 
 import {
   createUserWithEmailAndPassword,
@@ -318,6 +318,42 @@ export default function AuthPage() {
     }
   };
 
+  // Нууц үг мартсан үед дуудагдах функц
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      toast.error('Нууц үг сэргээх и-мэйл хаягаа зөв оруулна уу.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      toast.success(`Нууц үг сэргээх холбоосыг ${trimmedEmail} хаяг руу илгээлээ. И-мэйлээ шалгана уу.`);
+    } catch (error: unknown) {
+      const err = error as { code?: string; message: string };
+      console.error('Password Reset Error:', err);
+      let message = 'Нууц үг сэргээхэд алдаа гарлаа.';
+      switch (err.code) {
+        case 'auth/user-not-found':
+          message = 'Ийм и-мэйлтэй хэрэглэгч олдсонгүй.';
+          break;
+        case 'auth/invalid-email':
+          message = 'И-мэйл хаяг буруу байна.';
+          break;
+        default:
+          message = `Алдаа: ${err.message}`;
+      }
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
@@ -556,6 +592,10 @@ export default function AuthPage() {
                 <div><Label>Нууц үг</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
                 <Button onClick={handleLogin} disabled={loading} className="w-full mt-2">
                   {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
+                </Button>
+                {/* Нууц үг мартсан холбоос */}
+                <Button variant="link" onClick={handleForgotPassword} disabled={loading} className="w-full text-sm text-blue-600 hover:underline">
+                  Нууц үг мартсан?
                 </Button>
                 <Button variant="outline" onClick={handleGoogleLogin} className="w-full mt-2">
                   Google-ээр нэвтрэх

@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 // Эдгээр замуудад middleware ажиллахгүй.
 const EXCLUDED_PATHS = [
   '/auth', // Нэвтрэх хуудас
+  '/',     // Үндсэн хуудас (Home page) - Нэвтрээгүй үед ч хандах боломжтой
   '/api/', // API routes (Firebase Admin SDK-г энд ашиглана)
   '/unauthorized', // Эрхгүй үед харуулах хуудас
   '/_next/', // Next.js-ийн дотоод файлууд (JS, CSS, Image optimization гэх мэт)
@@ -43,8 +44,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // matcher нь middleware-ийг ажиллах замуудыг тодорхойлно.
   // Энэ regex нь EXCLUDED_PATHS-д заасан замуудаас бусад бүх замыг тааруулна.
-  // Жишээ нь: /admin, /student, /teacher, /moderator, / зэрэг замуудад ажиллана.
+  // Жишээ нь: /admin, /student, /teacher, /moderator зэрэг замуудад ажиллана.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api|auth|unauthorized).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|auth|unauthorized|^/$).*)', // Үндсэн хуудас / -г хассан
   ],
 };
