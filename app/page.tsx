@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, ClipboardList, TrendingUp, Mail, Phone, MapPin, Users, UserCheck, FileText, Award, ArrowUpCircle, Video,
   Sparkles, ShieldCheck, Lightbulb, MessageSquare, Newspaper, Handshake, Calendar, Star, Quote, BookText, Rocket, Send,
-  UserPlus, Search, Play, DollarSign, Tag, Folder, GraduationCap, Percent, Gift, Briefcase, Atom, Check // Check иконыг нэмж импортлосон
+  UserPlus, Search, Play, DollarSign, Folder, GraduationCap, Percent, Gift, Briefcase, Atom, Check // Tag иконыг устгасан
 } from 'lucide-react';
 
 // Sample teacher data
@@ -580,6 +580,7 @@ export default function Home() {
         <div className="grid md:grid-cols-3 gap-8 mt-8">
           {featuredCourses.map(course => (
             <div key={course.id} className="p-4 rounded-xl bg-blue-50 shadow-lg text-left">
+              {/* Image optimization warning: For better performance, consider using Next.js <Image /> component. */}
               <img src={course.image} alt={course.title} className="w-full h-32 object-cover rounded-lg mb-4" />
               <h3 className="text-lg font-semibold text-blue-800 mb-2">{course.title}</h3>
               <p className="text-sm text-gray-700 mb-4">{course.description}</p>
@@ -625,6 +626,7 @@ export default function Home() {
             {/* Duplicate teacher info to create continuous scroll */}
             {[...teachers, ...teachers].map((teacher, index) => (
               <div key={`${teacher.id}-${index}`} className="flex-shrink-0 w-40 p-4 bg-gray-50 rounded-xl shadow-md text-center border border-gray-200">
+                {/* Image optimization warning: For better performance, consider using Next.js <Image /> component. */}
                 <img
                   src={teacher.image}
                   alt={teacher.name}
@@ -651,8 +653,10 @@ export default function Home() {
           {testimonials.map(testimonial => (
             <div key={testimonial.id} className="p-6 rounded-xl bg-orange-50 shadow-lg text-left relative">
               <Quote className="absolute top-4 left-4 w-8 h-8 text-orange-300 opacity-20" />
-              <p className="text-base text-gray-700 italic mb-4 pl-10">"{testimonial.quote}"</p>
+              {/* Removed extra double quotes to fix react/no-unescaped-entities error */}
+              <p className="text-base text-gray-700 italic mb-4 pl-10">{testimonial.quote}</p>
               <div className="flex items-center justify-end">
+                {/* Image optimization warning: For better performance, consider using Next.js <Image /> component. */}
                 <img src={testimonial.avatar} alt={testimonial.author} className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-orange-400" />
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{testimonial.author}</p>
@@ -774,6 +778,7 @@ export default function Home() {
         <div className="grid md:grid-cols-3 gap-8 mt-8">
           {blogPosts.map(post => (
             <div key={post.id} className="p-4 rounded-xl bg-gray-50 shadow-lg text-left">
+              {/* Image optimization warning: For better performance, consider using Next.js <Image /> component. */}
               <img src={post.image} alt={post.title} className="w-full h-32 object-cover rounded-lg mb-4" />
               <h3 className="text-lg font-semibold text-gray-800 mb-2">{post.title}</h3>
               <p className="text-sm text-gray-700 mb-4">{post.summary}</p>
