@@ -4,7 +4,8 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/app/context/AuthContext'
-import Header from '@/components/Header' // ← Header нэмнэ
+import Header from '@/components/Header'
+import ScrollToTopButton from '@/components/ScrollToTopButton'; // ScrollToTopButton-ийг импортлоно
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,9 +29,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
-          <Header /> {/* ← бүх хуудсанд харагдах толгой */}
-          <main className='pt-12'>{children}</main>
+          <Header />
+          <main className='pt-[90px]'>{children}</main>
           <Toaster position="top-right" richColors closeButton/>
+
+          {/* ScrollToTopButton-ийг энд нэмнэ */}
+          <ScrollToTopButton /> 
         </AuthProvider>
       </body>
     </html>

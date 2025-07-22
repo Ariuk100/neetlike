@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  BookOpen, ClipboardList, TrendingUp, Mail, Phone, MapPin, Users, UserCheck, FileText, Award, ArrowUpCircle, Video,
+  BookOpen, ClipboardList, TrendingUp, Mail, Phone, MapPin, Users, UserCheck, FileText, Award, Video,
   Sparkles, ShieldCheck, Lightbulb, MessageSquare, Newspaper, Handshake, Calendar, Star, Quote, BookText, Rocket, Send,
   UserPlus, Search, Play, DollarSign, Folder, GraduationCap, Percent, Gift, Briefcase, Atom, Check // Tag иконыг устгасан
 } from 'lucide-react';
@@ -262,7 +262,7 @@ const enrollmentBenefits = [
 
 
 export default function Home() {
-  const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
+
 
   // Refs and states to control visibility of sections
   const aboutRef = useRef<HTMLElement>(null);
@@ -328,20 +328,7 @@ export default function Home() {
   const contactRef = useRef<HTMLElement>(null);
   const [contactVisible, setContactVisible] = useState(false);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setShowScrollToTopButton(true);
-      } else {
-        setShowScrollToTopButton(false);
-      }
-    };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
   // Use Intersection Observer to show sections
   useEffect(() => {
@@ -395,12 +382,7 @@ export default function Home() {
 
   }, []); // Runs only once on component mount
 
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  };
+ 
 
   const handleSubmitComment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -950,17 +932,6 @@ export default function Home() {
           <MapPin className="w-4 h-4 mr-2" /> Хаяг: Улаанбаатар хот, Монгол улс
         </p>
       </section>
-
-      {/* Scroll to top button */}
-      {showScrollToTopButton && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 transform hover:scale-110 z-50"
-          aria-label="Дээш гүйлгэх"
-        >
-          <ArrowUpCircle className="w-6 h-6" />
-        </button>
-      )}
 
       {/* Custom CSS for animations and blob effect */}
       <style jsx>{`

@@ -361,7 +361,9 @@ export default function AuthPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      if (user.displayName && !user.photoURL) {
+      // Google-ээс ирсэн displayName болон photoURL-ийг Firebase User Profile-д update хийх
+      // Энэ нь Firebase Auth User Record-д хадгалагдана.
+      if (user.displayName && !user.photoURL) { // Зөвхөн displayName байгаа ч photoURL байхгүй бол update хийнэ.
         await updateProfile(user, { displayName: user.displayName });
       }
 
@@ -370,24 +372,24 @@ export default function AuthPage() {
       console.log('ID Token after sign-in (Google):', idToken);
 
       // Google-ээр нэвтэрсэн хэрэглэгчийн мэдээллийг сервер талын API руу илгээх
+      // Зөвхөн Google-ээс ирсэн мэдээллийг profileData руу оруулах
+      const profileDataToSend: { name: string; photoURL?: string; } = { // Төрлийг зассан
+        name: user.displayName || user.email?.split('@')[0] || '', // Нэр эсвэл и-мэйлийн эхний хэсэг
+      };
+      if (user.photoURL) {
+        profileDataToSend.photoURL = user.photoURL; // Профайл зураг байвал нэмнэ
+      }
+      // Овог, утас, сургууль, анги, төрсөн он, хүйс, аймаг, дүүрэг зэрэг талбаруудыг Google-ээс авдаггүй тул энд оруулахгүй.
+      // Ингэснээр, хэрэв хэрэглэгч өмнө нь и-мэйлээр бүртгүүлж эдгээр талбарыг бөглөсөн бол
+      // Firestore дээрх `merge: true` үйлдэл нь тэдгээр утгыг хоосон болгож дарж бичихгүй.
+
       const registerProfileResponse = await fetch('/api/register-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: user.uid,
           email: user.email,
-          profileData: {
-            name: user.displayName || user.email?.split('@')[0] || '',
-            lastName: '', // Google-ээр ирэхгүй тул хоосон
-            phone: '',    // Google-ээр ирэхгүй тул хоосон
-            school: '',   // Google-ээр ирэхгүй тул хоосон
-            grade: '',    // Google-ээр ирэхгүй тул хоосон
-            birthYear: null, // Google-ээр ирэхгүй тул null
-            gender: '',   // Google-ээр ирэхгүй тул хоосон
-            province: '', // Google-ээр ирэхгүй тул хоосон
-            district: '', // Google-ээр ирэхгүй тул хоосон
-            // readableId болон createdAt-г сервер тал үүсгэнэ
-          }
+          profileData: profileDataToSend // Оновчтой болгосон profileData-г илгээх
         })
       });
 
