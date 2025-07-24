@@ -117,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Хэрэв хэрэглэгч нэвтрээгүй бол (logout хийсэн эсвэл сесс байхгүй)
         setUser(null);
         setLoading(false);
-        console.log('AuthContext: Хэрэглэгч нэвтрээгүй байна.');
         // Firestore listener нь дээр (onAuthStateChanged-ийн эхэнд) цэвэрлэгдсэн тул энд давхар цэвэрлэх шаардлагагүй.
       }
     });

@@ -280,9 +280,9 @@ export default function AuthPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      console.log('User object after sign-in (Email/Password):', user);
+   
       const idToken = await getIdToken(user, true); // true for force refresh
-      console.log('ID Token after sign-in (Email/Password):', idToken);
+     
 
       const apiLoginResponse = await fetch('/api/login', {
         method: 'POST',
@@ -296,7 +296,7 @@ export default function AuthPage() {
       }
 
       const responseData = await apiLoginResponse.json() as { success: boolean; uid: string; role: string; };
-      console.log('Login successful, role received:', responseData.role);
+
 
       toast.success('Амжилттай нэвтэрлээ!');
       redirectToRolePage(responseData.role);
@@ -414,7 +414,7 @@ export default function AuthPage() {
       }
 
       const responseData = await apiLoginResponse.json() as { success: boolean; uid: string; role: string; };
-      console.log('Google login successful, role received:', responseData.role);
+   
 
       toast.success('Google-ээр амжилттай нэвтэрлээ!');
       redirectToRolePage(responseData.role);
