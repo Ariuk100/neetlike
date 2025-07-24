@@ -254,23 +254,22 @@ useEffect(() => {
   const handleLogout = async () => {
     try {
       await signOut(auth)
-      console.log('Firebase client-side logout successful.');
-  
+       
       const response = await fetch('/api/logout', {
         method: 'POST',
       });
   
       if (!response.ok) {
         const errorData = await response.json() as { error?: string };
-        console.error('Server-side logout API error:', errorData);
+     
         throw new Error(errorData.error || 'Серверээс гарах үйлдэл амжилтгүй боллоо.');
       }
-      console.log('Server-side logout API successful.');
+      
   
       router.replace('/');
     } catch (err: unknown) {
       const errorMessage = (err instanceof Error) ? err.message : 'Үл мэдэгдэх алдаа гарлаа.';
-      console.error('Logout error:', errorMessage, err);
+   
       toast.error(`Гарах үед алдаа гарлаа: ${errorMessage}`);
     }
   }

@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firestoreUnsubscribe) {
         firestoreUnsubscribe();
         firestoreUnsubscribe = undefined; // Цэвэрлэсний дараа undefined болгоно.
-        console.log('AuthContext: Хуучин Firestore listener-г цэвэрлэв.');
+   
       }
 
       if (firebaseUser) { // Хэрэв хэрэглэгч нэвтэрсэн бол

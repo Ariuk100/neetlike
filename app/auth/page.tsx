@@ -368,9 +368,6 @@ export default function AuthPage() {
       }
 
       const idToken = await getIdToken(user, true);
-      console.log('User object after sign-in (Google):', user);
-      console.log('ID Token after sign-in (Google):', idToken);
-
       // Google-ээр нэвтэрсэн хэрэглэгчийн мэдээллийг сервер талын API руу илгээх
       // Зөвхөн Google-ээс ирсэн мэдээллийг profileData руу оруулах
       const profileDataToSend: { name: string; photoURL?: string; } = { // Төрлийг зассан
@@ -397,7 +394,6 @@ export default function AuthPage() {
         const errorData = await registerProfileResponse.json();
         throw new Error(errorData.error || 'Google бүртгэлийн профайл үүсгэхэд алдаа гарлаа.');
       }
-      console.log('✅ Server: Google user profile successfully sent to Firestore via API.');
 
 
       const apiLoginResponse = await fetch('/api/login', {
