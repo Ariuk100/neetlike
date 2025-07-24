@@ -8,7 +8,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
-import { UserCircle2, Home, BookOpen, Calculator, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Leaf, Calendar } from 'lucide-react'
+import { MoreHorizontal, UserCircle2, Home, BookOpen, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Leaf, Calendar, Puzzle, LayoutGrid, Target, Trophy, ListOrdered, ClipboardCheck } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 
@@ -35,21 +35,37 @@ const NAV_ITEMS: MenuItem[] = [
     type: 'link',
   },
   {
-    id: 'student-exams',
+    id: 'student-groups', // Шинэ
+    label: 'Бүлгүүд',
+    href: '/student/groups',
+    icon: LayoutGrid,
+    roles: ['student'],
+    type: 'link',
+  },
+  {
+    id: 'student-problems', // Шинэ
+    label: 'Бодлогууд',
+    href: '/student/problems',
+    icon: Target,
+    roles: ['student'],
+    type: 'link',
+  },
+  {
+    id: 'student-tests-main', // Шинэ (Хуучин Шалгалтууд-аас ялгаж нэрлэв)
+    label: 'Тестүүд',
+    href: '/student/tests', // Үндсэн тестүүдийн хуудас
+    icon: ClipboardCheck,
+    roles: ['student'],
+    type: 'link',
+  },
+  {
+    id: 'student-exams-main', // Шалгалтууд (дэд цэсээр харуулах хуучин хувилбар)
     label: 'Шалгалтууд',
     icon: BookOpen,
     roles: ['student'],
     type: 'dropdown',
     children: [
-      {
-        id: 'student-all-tests',
-        label: 'Бүх тест',
-        href: '/student/tests',
-        icon: ClipboardList,
-        roles: ['student'],
-        type: 'link',
-      },
-      {
+            {
         id: 'student-all-exams-nested', // Дэд dropdown-д зориулсан ID
         label: 'Бүх шалгалт',
         icon: null,
@@ -57,8 +73,6 @@ const NAV_ITEMS: MenuItem[] = [
         type: 'dropdown',
         children: [
           { id: 'student-eesh', label: 'ЭЕШ', href: '/student/exams/eesh', icon: Award, roles: ['student'], type: 'link' },
-          { id: 'student-math', label: 'Математик', href: '/student/tests/math', icon: Calculator, roles: ['student'], type: 'link' },
-          { id: 'student-biology', label: 'Биологи', href: '/student/tests/biology', icon: Leaf, roles: ['student'], type: 'link' },
         ],
       },
       {
@@ -71,6 +85,41 @@ const NAV_ITEMS: MenuItem[] = [
       },
     ],
   },
+  {
+    id: 'student-competitions', // Шинэ
+    label: 'Тэмцээнүүд',
+    href: '/student/competitions',
+    icon: Trophy,
+    roles: ['student'],
+    type: 'link',
+  },
+  {
+    id: 'student-other', // Шинэ
+    label: 'Бусад',
+    icon: MoreHorizontal,
+    roles: ['student'],
+    type: 'dropdown',
+    children: [
+      {
+        id: 'student-puzzles', // Шинэ
+        label: 'Тогмолууд',
+        href: '/student/puzzles',
+        icon: Puzzle,
+        roles: ['student'],
+        type: 'link',
+      },
+      {
+        id: 'student-leaderboard', // Шинэ
+        label: 'Чансаа',
+        href: '/student/leaderboard',
+        icon: ListOrdered,
+        roles: ['student'],
+        type: 'link',
+      },
+    ],
+  },
+  
+ 
 
   // Багшийн цэс
   {
@@ -106,6 +155,26 @@ const NAV_ITEMS: MenuItem[] = [
     icon: Users,
     roles: ['admin'],
     type: 'link',
+  },
+  {
+    id: 'admin-add',
+    label: 'Нэмэх',
+    href: '/admin/add',
+    icon: ClipboardList,
+    roles: ['admin'],
+    type: 'dropdown',
+    children: [
+      {
+        id: 'admin-add-chapter',
+        label: 'Ерөнхий',
+        icon: PlusCircle,
+        roles: ['admin'],
+        type: 'dropdown',
+        children: [
+          { id: 'admin-chapter-name', label: 'Сэдвийн мэдээлэл', href: '/admin/add/chapteradd', icon: null, roles: ['admin'], type: 'link' },
+        ],
+      },
+    ],
   },
 
   // Модераторын цэс
@@ -217,64 +286,77 @@ useEffect(() => {
 
   // Цэсний элементүүдийг рендерлэх функц
   // parentPath нь тухайн элементийн эцэг элементүүдийн ID-г агуулна (жишээ нь: ['student-exams'])
-  const renderMenuItems = (items: MenuItem[], currentRole: string | undefined, parentPath: string[] = []) => {
+   // Цэсний элементүүдийг рендерлэх функц
+   const renderMenuItems = (items: MenuItem[], currentRole: string | undefined, parentPath: string[] = []) => {
     return items.map((item) => {
+      // Хэрэглэгчийн үүрэгт тохирохгүй бол харуулахгүй
       if (!currentRole || !item.roles.includes(currentRole)) {
-        return null; // Хэрэглэгчийн үүрэгт тохирохгүй бол харуулахгүй
+        return null;
       }
 
       const IconComponent = item.icon;
-      // Тухайн элементийн ID нь openDropdownPath дотор байгаа эсэхийг шалгана
-      const isThisItemOpen = openDropdownPath[parentPath.length] === item.id;
+      // Одоогийн цэс нээлттэй эсэхийг шалгана
+      const isOpen = openDropdownPath.includes(item.id);
+      // Тухайн цэс дээр дарахад нээгдэх зам
+      const newPath = [...parentPath, item.id];
+
+      // Dropdown-г нээх/хаах функц
+      const handleItemClick = (e: React.MouseEvent) => {
+        if (item.type === 'dropdown') {
+          e.preventDefault(); // Холбоосоор явахаас сэргийлнэ
+          if (isOpen) {
+            // Хэрэв одоо нээлттэй байгаа бол хаана (өмнөх түвшин хүртэл хаана)
+            // Жишээ нь, ['a', 'b', 'c'] -> 'c' дээр дарахад -> ['a', 'b'] болно.
+            const currentItemIndexInPath = openDropdownPath.indexOf(item.id);
+            if (currentItemIndexInPath !== -1) {
+              setOpenDropdownPath(openDropdownPath.slice(0, currentItemIndexInPath));
+            } else {
+              // Хэрэв ямар нэг шалтгаанаар замд байхгүй ч нээлттэй байвал хаана.
+              setOpenDropdownPath(parentPath);
+            }
+          } else {
+            // Нээхдээ зөвхөн тухайн замыг нэмнэ (бусад зэрэгцээ dropdown-г хаана)
+            setOpenDropdownPath(newPath);
+          }
+        } else if (item.href) {
+          // Холбоос дээр дарахад бүх dropdown-г хаана
+          setOpenDropdownPath([]);
+        }
+      };
 
       if (item.type === 'link') {
         return (
           <Link
             key={item.id}
             href={item.href || '#'}
-            className={`block px-4 py-2 text-gray-800 hover:bg-blue-50 hover:text-[#00BFFF] transition-colors duration-200 ${parentPath.length > 0 ? 'flex items-center gap-2' : 'flex items-center gap-1'}`}
-            onClick={() => setOpenDropdownPath([])} // Холбоос дээр дарахад бүх dropdown-уудыг хаана
+            onClick={handleItemClick} // Link дээр дарахад хаах логик
+            className="flex items-center gap-2 hover:text-[#00BFFF] transition-colors duration-200 py-2 px-3 rounded-md hover:bg-white/10 text-sm" // Gap-г 2 болгож, text-sm болгосон
           >
-            {IconComponent && <IconComponent size={parentPath.length > 0 ? 16 : 18} className="text-gray-500" />}
+            {IconComponent && <IconComponent size={24} className="text-gray-500" />} {/* Icon-ы хэмжээг 24 болгосон */}
             {item.label}
           </Link>
         );
       } else if (item.type === 'dropdown' && item.children) {
-        const handleDropdownToggle = () => {
-          setOpenDropdownPath(prevPath => {
-            const currentItemIndexInPath = prevPath.indexOf(item.id);
-
-            if (isThisItemOpen) {
-              // Хэрэв энэ элемент одоогоор нээлттэй байвал, түүнийг болон түүнээс доошхи бүх дэд цэсүүдийг хаана.
-              return prevPath.slice(0, currentItemIndexInPath);
-            } else {
-              // Хэрэв энэ элемент нээлттэй биш байвал:
-              // Эцэг элементийн түвшин хүртэлх замыг хадгална.
-              const commonPath = prevPath.slice(0, parentPath.length);
-              // Энэ элементийг замд нэмнэ, ингэснээр ижил түвшний бусад дэд цэсүүд хаагдана.
-              return [...commonPath, item.id];
-            }
-          });
-        };
-
+        // Дэд цэсний байрлалыг тохируулна
+        const isSubMenu = parentPath.length > 0;
         return (
           <div key={item.id} className="relative">
             <button
-              onClick={handleDropdownToggle}
-              className={`w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-50 hover:text-[#00BFFF] transition-colors duration-200 flex items-center justify-between ${parentPath.length > 0 ? '' : 'gap-1'}`}
+              onClick={handleItemClick} // Dropdown товч дээр дарахад хаах/нээх логик
+              className={`flex items-center gap-2 hover:text-[#00BFFF] transition-colors duration-200 py-2 px-3 rounded-md hover:bg-white/10 focus:outline-none text-sm ${isOpen ? 'text-[#00BFFF] bg-white/10' : ''}`} // Gap-г 2 болгож, text-sm болгосон
             >
-              {IconComponent && <IconComponent size={parentPath.length > 0 ? 16 : 18} className="inline-block mr-2 text-gray-500" />}
-              {item.label} {isThisItemOpen ? (parentPath.length > 0 ? '▾' : '▴') : (parentPath.length > 0 ? '▸' : '▾')}
+              {IconComponent && <IconComponent size={24} className="text-gray-500" />} {/* Icon-ы хэмжээг 24 болгосон */}
+              {item.label} {isSubMenu ? '▸' : '▾'}
             </button>
-            {isThisItemOpen && ( // Зөвхөн энэ элемент нээлттэй байвал түүний дэд цэсүүдийг рендерлэнэ
+            {isOpen && ( // Зөвхөн энэ элемент нээлттэй байвал түүний дэд цэсүүдийг рендерлэнэ
               <motion.div
-                initial={{ opacity: 0, y: parentPath.length > 0 ? 0 : -10, x: parentPath.length > 0 ? -10 : 0 }}
+                initial={{ opacity: 0, y: isSubMenu ? 0 : -10, x: isSubMenu ? -10 : 0 }}
                 animate={{ opacity: 1, y: 0, x: 0 }}
-                exit={{ opacity: 0, y: parentPath.length > 0 ? 0 : -10, x: parentPath.length > 0 ? -10 : 0 }}
+                exit={{ opacity: 0, y: isSubMenu ? 0 : -10, x: isSubMenu ? -10 : 0 }}
                 transition={{ duration: 0.2 }}
-                className={`absolute ${parentPath.length > 0 ? 'top-0 left-full ml-1' : 'top-full left-0 mt-2'} bg-white border border-gray-200 rounded-md shadow-lg ${parentPath.length > 0 ? 'w-44 z-[70]' : 'w-48 z-[60]'} ${parentPath.length > 0 ? 'overflow-hidden' : ''}`}
+                className={`absolute ${isSubMenu ? 'top-0 left-full ml-1' : 'top-full left-0 mt-2'} bg-white border border-gray-200 rounded-md shadow-lg ${isSubMenu ? 'w-44 z-[70]' : 'w-48 z-[60]'} p-1`}
               >
-                {renderMenuItems(item.children, currentRole, [...parentPath, item.id])}
+                {renderMenuItems(item.children, currentRole, newPath)}
               </motion.div>
             )}
           </div>
@@ -283,6 +365,7 @@ useEffect(() => {
       return null;
     });
   };
+
 
 
   return (

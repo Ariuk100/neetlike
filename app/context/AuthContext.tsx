@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) { // Хэрэв хэрэглэгч нэвтэрсэн бол
         try {
           const idTokenResult = await firebaseUser.getIdTokenResult(true);
-          console.log('AuthContext: Full ID Token Claims:', idTokenResult.claims);
+      
 
           const customRole = (idTokenResult.claims.role as 'admin' | 'teacher' | 'student' | 'moderator') || 'student';
 
@@ -74,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             let firestoreUserData: Partial<CustomUser> = {};
             if (docSnap.exists()) {
               firestoreUserData = docSnap.data() as Partial<CustomUser>;
-              console.log('AuthContext: Firestore хэрэглэгчийн баримт шинэчлэгдлээ/олдлоо:', firestoreUserData);
             } else {
               console.warn(`AuthContext: UID: ${firebaseUser.uid} -д холбогдох хэрэглэгчийн баримт олдсонгүй (Firestore).`);
             }
@@ -88,7 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
 
             setUser(customUser);
-            console.log('AuthContext: User state-г нэгтгэсэн мэдээллээр шинэчиллээ:', customUser);
             setLoading(false);
           }, (firestoreError) => {
             console.error('🔥 AuthContext: Firestore баримтыг сонсоход алдаа гарлаа:', firestoreError);
