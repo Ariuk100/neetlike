@@ -8,7 +8,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, UserCircle2, Home, BookOpen, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Leaf, Calendar, Puzzle, LayoutGrid, Target, Trophy, ListOrdered, ClipboardCheck } from 'lucide-react'
+import { MoreHorizontal, UserCircle2, Home, BookOpen, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Calendar, Puzzle, LayoutGrid, Target, Trophy, ListOrdered, ClipboardCheck } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 

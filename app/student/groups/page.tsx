@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { BookOpen, Users, PlayCircle, Home, LayoutGrid } from 'lucide-react'; // Home болон LayoutGrid иконыг импортлосон
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/ui/skeleton'; // Skeleton компонент

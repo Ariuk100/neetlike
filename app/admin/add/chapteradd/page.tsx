@@ -10,7 +10,6 @@ import {
   setDoc,
   Timestamp,
   where,
-  updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
