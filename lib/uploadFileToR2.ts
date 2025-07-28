@@ -1,7 +1,7 @@
 // lib/uploadFileToR2.ts
 import { toast } from 'sonner';
 
-const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'physx.mn'
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.physx.mn'
 
 export async function uploadFileToR2(file: File): Promise<string> {
   try {
