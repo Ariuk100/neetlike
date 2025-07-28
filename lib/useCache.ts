@@ -1,4 +1,4 @@
-// lib/useCache.ts (with LRU, size, clearAll, Context)
+// lib/useCache.ts
 import { useCallback } from 'react';
 
 interface CacheOptions {
@@ -14,34 +14,53 @@ interface CacheItem<T> {
 }
 
 export function useCache(storageKeyPrefix: string = '', defaultOptions?: CacheOptions) {
-  const getStorage = (type: 'local' | 'session') =>
-    type === 'local' ? localStorage : sessionStorage;
+  // Хөтчийн орчныг шалгана
+  const isBrowser = typeof window !== 'undefined';
+
+  const getStorage = (type: 'local' | 'session') => {
+    if (isBrowser) {
+      return type === 'local' ? localStorage : sessionStorage;
+    }
+    // Хэрэв сервер тал дээр ажиллаж байвал null эсвэл mock объект буцаана
+    // Mock объект нь getItem, setItem, removeItem гэх мэт функцуудыг хоосон хийнэ
+    return {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {}, // clear функц нэмсэн
+      length: 0,
+      key: () => null
+    };
+  };
 
   const now = () => Date.now();
 
   const getAllKeys = useCallback(
     (storage: 'local' | 'session' = 'session'): string[] => {
       const store = getStorage(storage);
-      return Object.keys(store).filter(k => k.startsWith(storageKeyPrefix));
+      // isBrowser шалгалтыг энд мөн хийнэ, учир нь store нь mock объект байж болно
+      return isBrowser ? Object.keys(store).filter(k => k.startsWith(storageKeyPrefix)) : [];
     },
-    [storageKeyPrefix]
+    [storageKeyPrefix, isBrowser]
   );
 
   const size = useCallback(
-    (storage: 'local' | 'session' = 'session') => getAllKeys(storage).length,
-    [getAllKeys]
+    (storage: 'local' | 'session' = 'session') => isBrowser ? getAllKeys(storage).length : 0,
+    [getAllKeys, isBrowser]
   );
 
   const clearAll = useCallback(
     (storage: 'local' | 'session' = 'session') => {
+      if (!isBrowser) return; // Сервер дээр бол юу ч хийхгүй
       const store = getStorage(storage);
       getAllKeys(storage).forEach(key => store.removeItem(key));
     },
-    [getAllKeys]
+    [getAllKeys, isBrowser]
   );
 
   const enforceLRULimit = useCallback(
     (storage: 'local' | 'session', maxSize: number) => {
+      if (!isBrowser) return; // Сервер дээр бол юу ч хийхгүй
       const store = getStorage(storage);
       const keys = getAllKeys(storage);
       if (keys.length <= maxSize) return;
@@ -57,11 +76,12 @@ export function useCache(storageKeyPrefix: string = '', defaultOptions?: CacheOp
       items.sort((a, b) => a.lastAccessed - b.lastAccessed);
       items.slice(0, keys.length - maxSize).forEach(item => store.removeItem(item.key));
     },
-    [getAllKeys]
+    [getAllKeys, isBrowser]
   );
 
   const get = useCallback(
     <T>(key: string, options?: CacheOptions): T | null => {
+      if (!isBrowser) return null; // Сервер дээр бол null буцаана
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { storage = 'session', expiryMs = 5 * 60 * 1000 } = {
         ...defaultOptions,
@@ -84,11 +104,12 @@ export function useCache(storageKeyPrefix: string = '', defaultOptions?: CacheOp
         return null;
       }
     },
-    [storageKeyPrefix, defaultOptions]
+    [storageKeyPrefix, defaultOptions, isBrowser]
   );
 
   const set = useCallback(
     (key: string, data: unknown, options?: CacheOptions) => {
+      if (!isBrowser) return; // Сервер дээр бол юу ч хийхгүй
       const { storage = 'session', expiryMs = 5 * 60 * 1000, maxSize } = {
         ...defaultOptions,
         ...options,
@@ -102,14 +123,15 @@ export function useCache(storageKeyPrefix: string = '', defaultOptions?: CacheOp
       store.setItem(`${storageKeyPrefix}${key}`, JSON.stringify(item));
       if (maxSize) enforceLRULimit(storage, maxSize);
     },
-    [storageKeyPrefix, defaultOptions, enforceLRULimit]
+    [storageKeyPrefix, defaultOptions, enforceLRULimit, isBrowser]
   );
 
   const remove = useCallback(
     (key: string, storage: 'local' | 'session' = 'session') => {
+      if (!isBrowser) return; // Сервер дээр бол юу ч хийхгүй
       getStorage(storage).removeItem(`${storageKeyPrefix}${key}`);
     },
-    [storageKeyPrefix]
+    [storageKeyPrefix, isBrowser]
   );
 
   return { get, set, remove, clearAll, size, getAllKeys };
