@@ -112,7 +112,7 @@ export default function StudentGroupsPage() {
     };
 
     fetchAndCache();
-  }, [currentPage, cache, context]);
+  }, [currentPage]); // ✅ cache, context хассан
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

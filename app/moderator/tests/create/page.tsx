@@ -12,28 +12,30 @@ import { Button } from '@/components/ui/button';
 import LatexRenderer from '@/components/LatexRenderer';
 import { uploadFileToR2 } from '@/lib/uploadFileToR2';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+// Доорх импортуудыг нэмнэ
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, increment } from 'firebase/firestore'; // FieldValue болон increment нэмсэн
 import { toast } from 'sonner';
 import { useAuth } from '@/app/context/AuthContext';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useCacheContext } from '@/lib/CacheContext';
 
-// Define types for form state
+// ... (бусад type definitions болон interface-үүд өөрчлөгдөөгүй)
 type AnswerType = 'choice-single' | 'choice-multiple' | 'input' | 'problem' | 'experiment' | 'truefalse';
-type BloomLevel = 'МЭДЭХ' | 'ОЙЛГОХ' | 'ХЭРЭГЛЭХ' | 'ЗАДЛАН ШИНЖЛЭХ' | 'ҮНЭЛЭХ' | 'БҮТЭЭХ' | '';
-type DifficultyLevel = 'амархан' | 'дунд' | 'хүнд' | '';
+type BloomLevel = 'СЭРГЭЭН САНАХ' | 'ОЙЛГОХ' | 'ХЭРЭГЛЭХ' | 'ЗАДЛАН ШИНЖЛЭХ' | 'ҮНЭЛЭХ' | 'БҮТЭЭХ' | '';
+type DifficultyLevel = 'Амархан' | 'Дунд' | 'Хүнд' | '';
 type SourceType = 'IGCSE' | 'IB' | 'NEET' | 'JEE' | 'AS LEVEL' | 'A LEVEL' | 'RUSSIA' | 'AP' | 'SAT' | 'MONGOL' | '';
 
 interface Chapter {
   id: string;
   name: string;
+  quizCount?: number; // quizCount талбарыг нэмсэн
 }
 
 interface Subchapter {
   id: string;
   name: string;
   chapterId: string;
+  quizCount?: number; // quizCount талбарыг нэмсэн
 }
 
 interface FormData {
@@ -223,13 +225,7 @@ export default function TeacherTestPage() {
     handleInputChange('imageFiles', newImageFiles);
   }, [form.imageFiles, handleInputChange]);
 
-  const handleMultipleChoiceChange = useCallback((option: string, checked: boolean) => {
-    if (checked) {
-      handleInputChange('correctAnswerMultiple', [...form.correctAnswerMultiple, option]);
-    } else {
-      handleInputChange('correctAnswerMultiple', form.correctAnswerMultiple.filter((item) => item !== option));
-    }
-  }, [form.correctAnswerMultiple, handleInputChange]);
+  
 
   const handleSave = async () => {
     if (!user || !user.uid) {
@@ -279,6 +275,37 @@ export default function TeacherTestPage() {
       };
       await addDoc(collection(db, 'test'), questionData);
       toast.success('Амжилттай хадгаллаа!');
+
+      // Chapters болон Subchapters-ийн quizCount-ийг нэмэгдүүлэх хэсэг
+      try {
+        // Бүлгийн quizCount-ийг нэмэгдүүлэх
+        const selectedChapter = chapters.find(chapter => chapter.name === form.topic);
+        if (selectedChapter) {
+          const chapterRef = doc(db, 'chapters', selectedChapter.id);
+          await updateDoc(chapterRef, {
+            quizCount: increment(1)
+          });
+          console.log(`Бүлэг "${selectedChapter.name}"-ийн quizCount нэмэгдлээ.`);
+        } else {
+          console.warn(`Бүлэг "${form.topic}" олдсонгүй, quizCount нэмэгдүүлээгүй.`);
+        }
+
+        // Дэд бүлгийн quizCount-ийг нэмэгдүүлэх
+        const selectedSubchapter = subchapters.find(sub => sub.name === form.subtopic);
+        if (selectedSubchapter) {
+          const subchapterRef = doc(db, 'subchapters', selectedSubchapter.id);
+          await updateDoc(subchapterRef, {
+            quizCount: increment(1)
+          });
+          console.log(`Дэд бүлэг "${selectedSubchapter.name}"-ийн quizCount нэмэгдлээ.`);
+        } else {
+          console.warn(`Дэд бүлэг "${form.subtopic}" олдсонгүй, quizCount нэмэгдүүлээгүй.`);
+        }
+      } catch (countError) {
+        console.error("QuizCount-ийг шинэчлэхэд алдаа гарлаа:", countError);
+        toast.error("QuizCount-ийг шинэчлэхэд алдаа гарлаа.");
+      }
+
       remove(FORM_CACHE_KEY);
       setForm({
         questionNumber: '',
@@ -358,7 +385,7 @@ export default function TeacherTestPage() {
                   disabled={loadingChapters}
                 >
                   <SelectTrigger id="topic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
-                    <SelectValue placeholder={loadingChapters ? "Ачаалж байна..." : "Бүлэг сонгоно уу"} />
+                  <SelectValue placeholder={!form.topic && loadingChapters ? "Ачаалж байна..." : "Бүлэг сонгоно уу"} />
                   </SelectTrigger>
                   <SelectContent>
                     {chapters.map((chapter) => (
@@ -377,17 +404,21 @@ export default function TeacherTestPage() {
                   disabled={loadingSubchapters || !form.topic}
                 >
                   <SelectTrigger id="subtopic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
-                    <SelectValue
-                      placeholder={
-                        loadingSubchapters
-                          ? "Дэд бүлэг ачаалж байна..."
-                          : !form.topic
-                            ? "Эхлээд бүлэг сонгоно уу"
-                            : subchapters.length === 0
-                              ? "Дэд бүлэг байхгүй"
-                              : "Дэд бүлэг сонгоно уу"
-                      }
-                    />
+                  <SelectValue
+  placeholder={
+    // Хэрэв топик сонгогдсон бөгөөд дэд бүлгүүд ачаалж байгаа бол "Дэд бүлэг ачаалж байна..." харуулна.
+    form.topic && loadingSubchapters
+      ? "Дэд бүлэг ачаалж байна..."
+      // Хэрэв топик сонгогдоогүй бол "Эхлээд бүлэг сонгоно уу" харуулна.
+      : !form.topic
+        ? "Эхлээд бүлэг сонгоно уу"
+        // Хэрэв топик сонгогдсон, ачаалагдаагүй, дэд бүлэг байхгүй бол "Дэд бүлэг байхгүй" харуулна.
+        : form.topic && !loadingSubchapters && subchapters.length === 0
+          ? "Дэд бүлэг байхгүй"
+          // Бусад тохиолдолд, өгөгдмөл "Дэд бүлэг сонгоно уу" харуулна.
+          : "Дэд бүлэг сонгоно уу"
+  }
+/>
                   </SelectTrigger>
                   <SelectContent>
                     {subchapters.map((subchapter) => (
@@ -506,23 +537,32 @@ export default function TeacherTestPage() {
                   </>
                 )}
 
-                {form.answerType === 'choice-multiple' && (
-                  <>
-                    <Label>Зөв хариултууд</Label>
-                    <div className="flex space-x-4">
-                      {['A', 'B', 'C', 'D', 'E'].map((opt) => (
-                        <div key={opt} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`multiple-choice-${opt}`}
-                            checked={form.correctAnswerMultiple.includes(opt)}
-                            onCheckedChange={(checked: boolean) => handleMultipleChoiceChange(opt, checked)}
-                          />
-                          <Label htmlFor={`multiple-choice-${opt}`}>{opt}</Label>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+{form.answerType === 'choice-multiple' && (
+  <>
+    <Label>Зөв хариултууд</Label>
+    <div className="grid grid-cols-5 gap-2">
+      {['A', 'B', 'C', 'D', 'E'].map((opt) => {
+        const isSelected = form.correctAnswerMultiple.includes(opt);
+        return (
+          <Button
+            key={opt}
+            type="button"
+            variant={isSelected ? 'default' : 'outline'}
+            className="w-full"
+            onClick={() => {
+              const updated = isSelected
+                ? form.correctAnswerMultiple.filter((v) => v !== opt)
+                : [...form.correctAnswerMultiple, opt];
+              handleInputChange('correctAnswerMultiple', updated);
+            }}
+          >
+            {opt}
+          </Button>
+        );
+      })}
+    </div>
+  </>
+)}
               </>
             )}
 
@@ -533,25 +573,30 @@ export default function TeacherTestPage() {
               </>
             )}
 
-            {form.answerType === 'truefalse' && (
-              <>
-                <Label>Зөв хариулт</Label>
-                <RadioGroup
-                  value={form.correctAnswerTrueFalse}
-                  onValueChange={(v: 'true' | 'false' | '') => handleInputChange('correctAnswerTrueFalse', v)}
-                  className="flex space-x-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="true" id="truefalse-true" />
-                    <Label htmlFor="truefalse-true">Үнэн</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="false" id="truefalse-false" />
-                    <Label htmlFor="truefalse-false">Худал</Label>
-                  </div>
-                </RadioGroup>
-              </>
-            )}
+{form.answerType === 'truefalse' && (
+  <>
+    <Label>Зөв хариулт</Label>
+    <div className="grid grid-cols-2 gap-4 max-w-sm">
+      {[
+        { value: 'true', label: 'Үнэн' },
+        { value: 'false', label: 'Худал' },
+      ].map((item) => (
+        <button
+          key={item.value}
+          type="button"
+          className={`py-2 rounded border text-center font-medium ${
+            form.correctAnswerTrueFalse === item.value
+              ? 'bg-black text-white'
+              : 'bg-white text-black border-gray-300'
+          }`}
+          onClick={() => handleInputChange('correctAnswerTrueFalse', item.value as 'true' | 'false')}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  </>
+)}
 
             <Label htmlFor="explanation">Бодолт (Latex)</Label>
             <Textarea id="explanation" value={form.explanation} onChange={(e) => handleInputChange('explanation', e.target.value)} />

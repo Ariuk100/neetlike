@@ -1,4 +1,4 @@
-// lib/cachecontext.tsx (Persistent Cache through Context)
+// lib/CacheContext.tsx (Persistent Cache through Context)
 'use client';
 
 import React, { createContext, useContext } from 'react';

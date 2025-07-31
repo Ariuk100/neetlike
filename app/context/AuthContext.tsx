@@ -7,7 +7,8 @@ import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 // Хэрэглэгчийн мэдээллийн төрлийг тодорхойлно (таныхтай ижил байна)
-interface CustomUser {
+export interface CustomUser {
+  displayName: string | null;
   uid: string;
   email: string | null;
   role?: 'admin' | 'teacher' | 'student' | 'moderator';
@@ -26,7 +27,7 @@ interface CustomUser {
 }
 
 // AuthContext-ийн төрлийг тодорхойлно
-interface AuthContextType {
+export interface AuthContextType {
   user: CustomUser | null;
   loading: boolean;
   error: string | null;

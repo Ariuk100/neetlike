@@ -1,8 +1,9 @@
 // lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth"; // GoogleAuthProvider-г нэмсэн
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore"; // Хэрэв Firestore ашиглах бол
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage"; // Storage-г импортлосон!
 
 // Таны web app-ын Firebase тохиргоо
 // Эдгээр утгуудыг .env.local файлаас уншина
@@ -22,8 +23,11 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Firebase үйлчилгээнүүдийг эхлүүлнэ
 export const auth = getAuth(app);
-export const analytics = typeof window !== 'undefined' && getAnalytics(app); // Analytics нь зөвхөн хөтчийн орчинд ажиллана
-export const db = getFirestore(app); // Firestore-г эхлүүлнэ
+export const analytics = typeof window !== 'undefined' && getAnalytics(app);
+export const db = getFirestore(app);
+
+// Firebase Storage-г эхлүүлж экспортлосон!
+export const storage = getStorage(app); // <== ЭНД НЭМСЭН
 
 // GoogleAuthProvider-г үүсгэж экспортлосон
 export const googleProvider = new GoogleAuthProvider();

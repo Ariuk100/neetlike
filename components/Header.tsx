@@ -178,35 +178,74 @@ const NAV_ITEMS: MenuItem[] = [
   },
 
   // Модераторын цэс
-  {
-    id: 'moderator-tests',
-    label: 'Тестүүд',
-    icon: BookOpen,
-    roles: ['moderator'],
-    type: 'dropdown',
-    children: [
-      {
-        id: 'moderator-create-test',
-        label: 'Тест хийх',
-        icon: PlusCircle,
-        roles: ['moderator'],
-        type: 'dropdown',
-        children: [
-          { id: 'moderator-create-single', label: 'Нэг нэгээр хийх', href: '/moderator/tests/create', icon: null, roles: ['moderator'], type: 'link' },
-        ],
-      },
-      {
-        id: 'moderator-view-test',
-        label: 'Тест харах',
-        icon: Eye,
-        roles: ['moderator'],
-        type: 'dropdown',
-        children: [
-          { id: 'moderator-view-all', label: 'Тест харах', href: '/moderator/tests/view', icon: null, roles: ['moderator'], type: 'link' },
-        ],
-      },
-    ],
-  },
+{
+  id: 'moderator-tests',
+  label: 'Тестүүд',
+  icon: BookOpen,
+  roles: ['moderator'],
+  type: 'dropdown',
+  children: [
+    {
+      id: 'moderator-create-test',
+      label: 'Тест хийх',
+      icon: PlusCircle,
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-create-single',
+          label: 'Нэг нэгээр хийх',
+          href: '/moderator/tests/create',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+    {
+      id: 'moderator-view-test',
+      label: 'Тест харах',
+      icon: Eye,
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-view-all',
+          label: 'Тест харах',
+          href: '/moderator/tests/view',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+    {
+      id: 'moderator-subjects',
+      label: 'Хичээлүүд',
+      icon: BookOpen, // Та өөр icon хүсвэл солино уу
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-add-subject',
+          label: 'Хичээл нэмэх',
+          href: '/moderator/lessons/add',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+        {
+          id: 'moderator-view-subjects',
+          label: 'Хичээл харах',
+          href: '/moderator/lessons/view',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+  ],
+},
 ];
 
 
