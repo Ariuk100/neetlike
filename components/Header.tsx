@@ -8,7 +8,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, UserCircle2, Home, BookOpen, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Calendar, Puzzle, LayoutGrid, Target, Trophy, ListOrdered, ClipboardCheck } from 'lucide-react'
+import { MoreHorizontal, UserCircle2, Home, BookOpen, Users, PlusCircle, Eye, Settings, ClipboardList, Award, Calendar, Puzzle, LayoutGrid, Target, Trophy, ListOrdered, ClipboardCheck, FileQuestion
+} from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 
@@ -179,38 +180,29 @@ const NAV_ITEMS: MenuItem[] = [
 
   // Модераторын цэс
 {
-  id: 'moderator-tests',
-  label: 'Тестүүд',
+  id: 'moderator-content',
+  label: 'Контент',
   icon: BookOpen,
   roles: ['moderator'],
   type: 'dropdown',
   children: [
     {
-      id: 'moderator-create-test',
-      label: 'Тест хийх',
+      id: 'moderator-tests',
+      label: 'Тестүүд',
       icon: PlusCircle,
       roles: ['moderator'],
       type: 'dropdown',
       children: [
         {
-          id: 'moderator-create-single',
-          label: 'Нэг нэгээр хийх',
+          id: 'moderator-create-tests',
+          label: 'Тест нэмэх',
           href: '/moderator/tests/create',
           icon: null,
           roles: ['moderator'],
           type: 'link',
         },
-      ],
-    },
-    {
-      id: 'moderator-view-test',
-      label: 'Тест харах',
-      icon: Eye,
-      roles: ['moderator'],
-      type: 'dropdown',
-      children: [
         {
-          id: 'moderator-view-all',
+          id: 'moderator-view-tests',
           label: 'Тест харах',
           href: '/moderator/tests/view',
           icon: null,
@@ -238,6 +230,81 @@ const NAV_ITEMS: MenuItem[] = [
           id: 'moderator-view-subjects',
           label: 'Хичээл харах',
           href: '/moderator/lessons/view',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+    {
+      id: 'moderator-problems',
+      label: 'Бодлогууд',
+      icon: Eye, // Та өөр icon хүсвэл солино уу
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-add-problems',
+          label: 'Бодлого нэмэх',
+          href: '/moderator/problems/add',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+        {
+          id: 'moderator-view-problems',
+          label: 'Бодлого харах',
+          href: '/moderator/problems/view',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+    {
+      id: 'moderator-exams',
+      label: 'Шалгалтууд',
+      icon: FileQuestion,
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-add-exams',
+          label: 'Шалгалт нэмэх',
+          href: '/moderator/exams/add',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+        {
+          id: 'moderator-view-exams',
+          label: 'Шалгалт харах',
+          href: '/moderator/exams/view',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+      ],
+    },
+    {
+      id: 'moderator-competitions',
+      label: 'Тэмцээнүүд',
+      icon: Trophy,
+      roles: ['moderator'],
+      type: 'dropdown',
+      children: [
+        {
+          id: 'moderator-add-competitions',
+          label: 'Тэмцээн нэмэх',
+          href: '/moderator/competitions/add',
+          icon: null,
+          roles: ['moderator'],
+          type: 'link',
+        },
+        {
+          id: 'moderator-view-competitions',
+          label: 'Тэмцээн харах',
+          href: '/moderator/competitions/view',
           icon: null,
           roles: ['moderator'],
           type: 'link',

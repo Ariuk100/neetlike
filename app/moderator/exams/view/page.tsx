@@ -1,3 +1,5 @@
+
+
 // moderator/exams/view/page.tsx
 'use client';
 
@@ -13,7 +15,8 @@ import {
   getDocs,
   where,
   DocumentSnapshot,
-  deleteDoc
+  deleteDoc,
+  getCountFromServer,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/app/context/AuthContext';
@@ -43,31 +46,31 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, ArrowRight, Edit, Save, XCircle, Loader2, Trash2, PlusCircle, Archive, RotateCcw } from 'lucide-react';
-
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-
-// ConfirmationModal-ийг устгасан, оронд нь Dialog ашиглана
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Timestamp } from 'firebase/firestore';
 
-// Шалгалтын төрлүүд (exams/add-тай ижил байх ёстой)
+// Шалгалтын төрлүүд
 type ExamType = 'Түвшин тогтоох' | 'Уралдаант' | 'ЭЕШ' | 'Олимпиад' | 'Бусад' | '';
-type ExamStatus = 'active' | 'inactive' | 'archived'; // Шинэ: Шалгалтын төлөв
+type ExamStatus = 'active' | 'inactive' | 'archived';
 
 interface ExamQuestion {
-  id: string; // Асуулт эсвэл бодлогын ID (Firebase document ID)
-  collection: 'test' | 'problems'; // Аль коллекцоос ирсэн бэ
-  score: number; // Энэ шалгалтад тухайн асуултын оноо
+  id: string;
+  collection: 'test' | 'problems';
+  score: number;
 }
 
 interface ExamViewData {
@@ -78,16 +81,15 @@ interface ExamViewData {
   subject: string;
   topic: string | null;
   subtopic: string | null;
-  timeLimit: number; // Нийт хугацаа секундээр
-  totalScore: number; // Нийт оноо
-  examDate: string; // Шалгалтын огноо (YYYY-MM-DD string)
-  questions: ExamQuestion[]; // Шалгалтын асуултууд
-  status: ExamStatus; // Шинэ: Шалгалтын идэвхтэй/идэвхгүй/архивлагдсан төлөв
-  createdAt: Date;
+  timeLimit: number;
+  totalScore: number;
+  examDate: string;
+  questions: ExamQuestion[];
+  status: ExamStatus;
+  createdAt: Timestamp;
   moderatorUid: string;
   moderatorName?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // Индекс сигнатурыг илүү уян хатан болгосон
+  // `any` төрлийг хэрэглэхгүй байхын тулд нэмэлт талбаруудыг энд тодорхойлох
 }
 
 interface FilterOption {
@@ -95,20 +97,13 @@ interface FilterOption {
   name: string;
 }
 
-// Firebase timestamp-ийг Date объект руу хөрвүүлэх функц
-const convertToDate = (timestamp: Date | { toDate: () => Date } | string | number | undefined | null): Date | undefined => {
+const convertToDate = (timestamp: Timestamp | undefined | null): Date | undefined => {
   if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (typeof timestamp === 'object' && 'toDate' in timestamp && typeof timestamp.toDate === 'function') return timestamp.toDate();
-  if (typeof timestamp === 'string') {
-    const parsedDate = new Date(timestamp);
-    if (!isNaN(parsedDate.getTime())) return parsedDate;
-  }
-  if (typeof timestamp === 'number') return new Date(timestamp);
-  console.warn('Unknown timestamp format for createdAt:', timestamp);
+  if (timestamp instanceof Timestamp) return timestamp.toDate();
   return undefined;
 };
 
+const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50];
 
 export default function ModeratorExamsViewPage() {
   const { user, loading: authLoading } = useAuth();
@@ -120,7 +115,7 @@ export default function ModeratorExamsViewPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE_OPTIONS[0]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -138,12 +133,10 @@ export default function ModeratorExamsViewPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
 
-  // Dialog-ын төлөвүүд
+  // AlertDialog-н төлөвүүд
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [examToDelete, setExamToDelete] = useState<{ id: string; moderatorUid: string } | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
-  const [examToArchive, setExamToArchive] = useState<{ id: string; currentStatus: ExamStatus; moderatorUid: string } | null>(null);
-
+  const [examToActOn, setExamToActOn] = useState<{ id: string; status: ExamStatus; moderatorUid: string } | null>(null);
 
   // Филтерүүдийн төлөв
   const [selectedModerator, setSelectedModerator] = useState<string>('all');
@@ -161,6 +154,7 @@ export default function ModeratorExamsViewPage() {
     'Олимпиад',
     'Бусад',
   ]);
+ 
   const [topicOptions, setTopicOptions] = useState<FilterOption[]>([]);
   const [subtopicOptions, setSubtopicOptions] = useState<FilterOption[]>([]);
 
@@ -173,14 +167,11 @@ export default function ModeratorExamsViewPage() {
     }
   }, [user, authLoading, router]);
 
-
-  // Филтерийн сонголтуудыг татах (модератор, бүлэг)
+  // Филтерийн сонголтуудыг татах
   useEffect(() => {
     const fetchFilterOptions = async () => {
       if (!db) return;
-
       try {
-        // Модератор татах
         const usersColRef = collection(db, 'users');
         const qUsers = query(
           usersColRef,
@@ -195,7 +186,6 @@ export default function ModeratorExamsViewPage() {
         });
         setModeratorOptions(mods);
 
-        // Бүлэг татах (chapters collection-оос)
         const topicsColRef = collection(db, 'chapters');
         const qTopics = query(topicsColRef, orderBy('name', 'asc'));
         const topicSnapshot = await getDocs(qTopics);
@@ -234,8 +224,8 @@ export default function ModeratorExamsViewPage() {
           return;
         }
 
-        const subtopicsColRef = collection(db, 'chapters', selectedTopicDoc.id, 'subchapters');
-        const qSubtopics = query(subtopicsColRef, orderBy('name', 'asc'));
+        const subtopicsColRef = collection(db, 'subchapters');
+        const qSubtopics = query(subtopicsColRef, where('chapterId', '==', selectedTopicDoc.id), orderBy('name', 'asc'));
         const subtopicSnapshot = await getDocs(qSubtopics);
         const subtopics: FilterOption[] = [];
         subtopicSnapshot.forEach(docSnap => {
@@ -269,7 +259,7 @@ export default function ModeratorExamsViewPage() {
     setSelectedExam(null);
 
     const examsColRef = collection(db, 'exams');
-    let baseQuery = query(examsColRef, orderBy('createdAt', 'desc')); // Хамгийн сүүлд үүсгэгдсэнээр эрэмбэлнэ
+    let baseQuery = query(examsColRef, orderBy('createdAt', 'desc'));
 
     // Филтерүүдийг нэмэх
     if (selectedModerator !== 'all') {
@@ -284,15 +274,11 @@ export default function ModeratorExamsViewPage() {
     if (selectedSubtopic !== 'all') {
       baseQuery = query(baseQuery, where('subtopic', '==', selectedSubtopic));
     }
-    if (selectedStatus !== 'all') { // Шинэ: Төлвөөр шүүх
+    if (selectedStatus !== 'all') {
       baseQuery = query(baseQuery, where('status', '==', selectedStatus));
     }
 
     let paginatedQuery;
-    let newLastVisible: DocumentSnapshot | null = null;
-    let newFirstVisible: DocumentSnapshot | null = null;
-
-    // Хуудаслалтын логик
     if (currentPage > 1 && pageCache.current.has(currentPage - 1)) {
         const startDoc = pageCache.current.get(currentPage - 1)!;
         paginatedQuery = query(baseQuery, startAfter(startDoc), limit(itemsPerPage));
@@ -320,14 +306,9 @@ export default function ModeratorExamsViewPage() {
           totalScore: data.totalScore || 0,
           examDate: data.examDate || '',
           questions: (Array.isArray(data.questions) ? data.questions : []) as ExamQuestion[],
-          status: (data.status as ExamStatus) || 'active', // Default 'active'
-          createdAt: convertToDate(data.createdAt) || new Date(),
+          status: (data.status as ExamStatus) || 'active',
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date()),
           moderatorUid: data.moderatorUid || 'Үл мэдэгдэх UID',
-          ...Object.fromEntries(Object.entries(data).filter(([key]) => !(key in {
-            id: true, title: true, description: true, examType: true, subject: true,
-            topic: true, subtopic: true, timeLimit: true, totalScore: true, examDate: true,
-            questions: true, status: true, createdAt: true, moderatorUid: true
-          })))
         };
         fetchedExams.push(examItem);
       });
@@ -342,9 +323,8 @@ export default function ModeratorExamsViewPage() {
       setExams(examsWithNames);
 
       if (snapshot.docs.length > 0) {
-        newFirstVisible = snapshot.docs[0];
-        newLastVisible = snapshot.docs[snapshot.docs.length - 1];
-        setFirstVisible(newFirstVisible);
+        setFirstVisible(snapshot.docs[0]);
+        const newLastVisible = snapshot.docs[snapshot.docs.length - 1];
         setLastVisible(newLastVisible);
 
         pageCache.current.set(currentPage, newLastVisible);
@@ -363,10 +343,9 @@ export default function ModeratorExamsViewPage() {
 
       setIsFirstPage(currentPage === 1);
 
-      // Нийт шалгалтын тоог филтер өөрчлөгдөхөд дахин тооцоолно
       if (totalItemsCount === null || selectedModerator !== 'all' || selectedExamType !== 'all' || selectedTopic !== 'all' || selectedSubtopic !== 'all' || selectedStatus !== 'all') {
-        const totalSnapshot = await getDocs(baseQuery);
-        setTotalItemsCount(totalSnapshot.size);
+        const countSnapshot = await getCountFromServer(baseQuery);
+        setTotalItemsCount(countSnapshot.data().count);
       }
 
     } catch (err) {
@@ -398,7 +377,6 @@ export default function ModeratorExamsViewPage() {
   // Хуудас солих функц
   const handlePageChange = (direction: 'prev' | 'next') => {
     if (loadingExams) return;
-
     if (direction === 'next') {
         if (!isLastPage) {
             setCurrentPage(prev => prev + 1);
@@ -425,20 +403,16 @@ export default function ModeratorExamsViewPage() {
 
   // Шалгалтыг хадгалах функц
   const handleSaveExam = async (examToSave: ExamViewData) => {
-    // Хэрэглэгчийн эрхийг шалгана. Админ эсвэл тухайн шалгалтыг үүсгэсэн модератор байх ёстой.
     if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
-      setError("Хадгалах эрх байхгүй байна.");
       toast.error("Хадгалах эрх байхгүй байна.");
       return;
     }
     if (user.role === 'moderator' && examToSave.moderatorUid !== user.uid) {
-        setError("Та зөвхөн өөрийн үүсгэсэн шалгалтыг засварлах боломжтой.");
         toast.error("Та зөвхөн өөрийн үүсгэсэн шалгалтыг засварлах боломжтой.");
         return;
     }
 
     if (!examToSave.id) {
-      setError("Засах шалгалтын ID олдсонгүй.");
       toast.error("Засах шалгалтын ID олдсонгүй.");
       return;
     }
@@ -450,36 +424,15 @@ export default function ModeratorExamsViewPage() {
 
       const updatedFields: Partial<ExamViewData> = {};
 
-      // ExamViewData интерфейс дээр байгаа бүх field-үүдийг давтан шалгаж өөрчлөгдсөн эсэхийг тогтооно
       for (const key of Object.keys(examToSave) as Array<keyof ExamViewData>) {
-        if (key === 'id' || key === 'moderatorName' || key === 'createdAt') continue; // Эдгээр талбаруудыг өөрчлөхгүй
+        if (key === 'id' || key === 'moderatorName' || key === 'createdAt') continue;
 
         const valueToSave = examToSave[key];
         const originalValue = originalExam?.[key];
 
-        if (valueToSave instanceof Date) {
-          if (originalValue instanceof Date) {
-            if (valueToSave.getTime() !== originalValue.getTime()) {
-              updatedFields[key] = valueToSave;
-            }
-          } else {
-            updatedFields[key] = valueToSave;
-          }
-        } else if (Array.isArray(valueToSave)) {
-          if (JSON.stringify(valueToSave) !== JSON.stringify(originalValue)) {
-            updatedFields[key] = valueToSave;
-          }
-        } else if (key === 'examDate') {
-            if (valueToSave !== originalValue) {
-                updatedFields[key] = valueToSave;
-            }
-        } else {
-          const comparableValueToSave = valueToSave === undefined ? null : valueToSave;
-          const comparableOriginalValue = originalValue === undefined ? null : originalValue;
-
-          if (comparableValueToSave !== comparableOriginalValue) {
-            updatedFields[key] = comparableValueToSave;
-          }
+        if (JSON.stringify(valueToSave) !== JSON.stringify(originalValue)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            updatedFields[key] = valueToSave as any; // Firestore updateDoc нь `any` хүлээн авдаг тул түр ашиглав.
         }
       }
 
@@ -497,69 +450,40 @@ export default function ModeratorExamsViewPage() {
 
     } catch (err: unknown) {
       console.error("Шалгалт хадгалахад алдаа гарлаа:", err);
-      setError("Шалгалт хадгалахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
-      toast.error("Шалгалт хадгалахад алдаа гарлаа.");
+      toast.error("Шалгалт хадгалахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
       setSaveLoading(false);
     }
   };
 
-  // Шалгалт устгах функц (Dialog-ийг дуудна)
-  const handleDeleteClick = (examId: string, moderatorUid: string) => {
-    setExamToDelete({ id: examId, moderatorUid });
-    setIsDeleteDialogOpen(true);
-  };
+  // Шалгалт устгах функц
+  const handleDeleteExam = async () => {
+    if (!examToActOn) return;
 
-  const confirmDeleteExam = async () => {
-    if (!examToDelete) return;
     setDeleteLoading(true);
     try {
-      await deleteDoc(doc(db, 'exams', examToDelete.id));
+      await deleteDoc(doc(db, 'exams', examToActOn.id));
       toast.success('Шалгалт амжилттай устгагдлаа!');
       setSelectedExam(null);
       fetchExams();
-      setIsDeleteDialogOpen(false); // Dialog-ийг хаах
-      setExamToDelete(null);
     } catch (err: unknown) {
       console.error("Шалгалт устгахад алдаа гарлаа:", err);
       toast.error("Шалгалт устгахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDeleteLoading(false);
+      setIsDeleteDialogOpen(false);
+      setExamToActOn(null);
     }
   };
 
-  // Шалгалтын төлөвийг архивлах/архиваас гаргах функц (Dialog-ийг дуудна)
-  const handleToggleArchiveClick = (examId: string, currentStatus: ExamStatus, moderatorUid: string) => {
-    setExamToArchive({ id: examId, currentStatus, moderatorUid });
-    setIsArchiveDialogOpen(true);
-  };
+  // Шалгалтын төлөвийг архивлах/архиваас гаргах функц
+  const handleToggleArchive = async () => {
+    if (!examToActOn) return;
 
-  const confirmToggleArchive = async () => {
-    if (!examToArchive) return;
-
-    const { id, currentStatus, moderatorUid } = examToArchive;
-
-    if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
-      toast.error("Төлөв өөрчлөх эрх байхгүй байна.");
-      setIsArchiveDialogOpen(false);
-      setExamToArchive(null);
-      return;
-    }
-    if (user.role === 'moderator' && moderatorUid !== user.uid) {
-      toast.error("Та зөвхөн өөрийн үүсгэсэн шалгалтын төлөвийг өөрчлөх боломжтой.");
-      setIsArchiveDialogOpen(false);
-      setExamToArchive(null);
-      return;
-    }
-
-    let newStatus: ExamStatus;
-    if (currentStatus === 'archived') {
-      newStatus = 'active';
-    } else {
-      newStatus = 'archived';
-    }
+    const { id, status } = examToActOn;
 
     setArchiveLoading(true);
     try {
+      const newStatus: ExamStatus = status === 'archived' ? 'active' : 'archived';
       const examRef = doc(db, 'exams', id);
       await updateDoc(examRef, { status: newStatus });
       toast.success(`Шалгалтын төлөв амжилттай ${newStatus === 'archived' ? 'архивлагдлаа' : 'идэвхтэй болголоо'}!`);
@@ -567,13 +491,13 @@ export default function ModeratorExamsViewPage() {
       if (selectedExam && selectedExam.id === id) {
         setSelectedExam(prev => prev ? { ...prev, status: newStatus } : null);
       }
-      setIsArchiveDialogOpen(false); // Dialog-ийг хаах
-      setExamToArchive(null);
     } catch (err: unknown) {
       console.error("Шалгалтын төлөвийг өөрчлөхөд алдаа гарлаа:", err);
       toast.error("Шалгалтын төлөвийг өөрчлөхөд алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setArchiveLoading(false);
+      setIsArchiveDialogOpen(false);
+      setExamToActOn(null);
     }
   };
 
@@ -595,7 +519,6 @@ export default function ModeratorExamsViewPage() {
         else {
           newQuestions[index] = { ...newQuestions[index], [field]: value };
         }
-        // Нийт оноог шинэчлэх
         const calculatedTotalScore = newQuestions.reduce((sum, q) => sum + q.score, 0);
         return { ...prev, questions: newQuestions, totalScore: calculatedTotalScore };
       });
@@ -624,8 +547,32 @@ export default function ModeratorExamsViewPage() {
     });
   }, []);
 
+  const confirmDelete = (examId: string, moderatorUid: string) => {
+      if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
+          toast.error("Устгах эрх байхгүй байна.");
+          return;
+      }
+      if (user.role === 'moderator' && moderatorUid !== user.uid) {
+          toast.error("Та зөвхөн өөрийн үүсгэсэн шалгалтыг устгах боломжтой.");
+          return;
+      }
+      setExamToActOn({ id: examId, status: 'active', moderatorUid });
+      setIsDeleteDialogOpen(true);
+  };
 
-  // Ачаалж байх үед харуулах Skeleton
+  const confirmArchive = (examId: string, currentStatus: ExamStatus, moderatorUid: string) => {
+      if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
+          toast.error("Төлөв өөрчлөх эрх байхгүй байна.");
+          return;
+      }
+      if (user.role === 'moderator' && moderatorUid !== user.uid) {
+          toast.error("Та зөвхөн өөрийн үүсгэсэн шалгалтын төлөвийг өөрчлөх боломжтой.");
+          return;
+      }
+      setExamToActOn({ id: examId, status: currentStatus, moderatorUid });
+      setIsArchiveDialogOpen(true);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -634,7 +581,6 @@ export default function ModeratorExamsViewPage() {
     );
   }
 
-  // Эрхийн шалгалт
   const requiredRoles = ['moderator', 'admin'];
   if (!user || !(user.role && requiredRoles.includes(user.role))) {
     return (
@@ -681,7 +627,6 @@ export default function ModeratorExamsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Шалгалтын төрөл филтер */}
                 <div className="mb-2">
                   <Label htmlFor="exam-type-filter" className="text-sm">Шалгалтын төрөл:</Label>
                   <Select value={selectedExamType} onValueChange={setSelectedExamType}>
@@ -696,7 +641,6 @@ export default function ModeratorExamsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Бүлэг филтер */}
                 <div className="mb-2">
                   <Label htmlFor="topic-filter" className="text-sm">Бүлэг:</Label>
                   <Select value={selectedTopic} onValueChange={setSelectedTopic}>
@@ -711,7 +655,6 @@ export default function ModeratorExamsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Дэд бүлэг филтер */}
                 <div className="mb-2">
                   <Label htmlFor="subtopic-filter" className="text-sm">Дэд бүлэг:</Label>
                   <Select
@@ -730,7 +673,6 @@ export default function ModeratorExamsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Төлөв филтер (Шинэ) */}
                 <div className="mb-2">
                   <Label htmlFor="status-filter" className="text-sm">Төлөв:</Label>
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -751,7 +693,7 @@ export default function ModeratorExamsViewPage() {
                     setSelectedExamType('all');
                     setSelectedTopic('all');
                     setSelectedSubtopic('all');
-                    setSelectedStatus('all'); // Төлвийн филтерийг цэвэрлэх
+                    setSelectedStatus('all');
                     setCurrentPage(1);
                     setSelectedExam(null);
                     setIsEditing(false);
@@ -805,9 +747,9 @@ export default function ModeratorExamsViewPage() {
                       <SelectValue placeholder="Сонгох" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
+                      {ITEMS_PER_PAGE_OPTIONS.map(num => (
+                          <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -854,14 +796,13 @@ export default function ModeratorExamsViewPage() {
             <div className="space-y-4">
               <div className="mb-4 flex justify-end gap-2">
                   {!isEditing ? (
-                      // "Засах", "Архивлах/Архиваас гаргах", "Устгах" товчлууруудыг харуулах нөхцөл
                       (user && (user.role === 'admin' || (user.role === 'moderator' && selectedExam.moderatorUid === user.uid))) ? (
                           <>
                             <Button onClick={() => { setIsEditing(true); setEditingExam({ ...selectedExam }); }} variant="outline" size="sm">
                                 <Edit className="mr-2 h-4 w-4" /> Засах
                             </Button>
                             <Button
-                                onClick={() => handleToggleArchiveClick(selectedExam.id, selectedExam.status, selectedExam.moderatorUid)}
+                                onClick={() => confirmArchive(selectedExam.id, selectedExam.status, selectedExam.moderatorUid)}
                                 variant="outline"
                                 size="sm"
                                 disabled={archiveLoading}
@@ -869,7 +810,7 @@ export default function ModeratorExamsViewPage() {
                                 {archiveLoading ? 'Ачаалж байна...' : selectedExam.status === 'archived' ? <><RotateCcw className="mr-2 h-4 w-4" /> Архиваас гаргах</> : <><Archive className="mr-2 h-4 w-4" /> Архивлах</>}
                             </Button>
                             <Button
-                                onClick={() => handleDeleteClick(selectedExam.id, selectedExam.moderatorUid)}
+                                onClick={() => confirmDelete(selectedExam.id, selectedExam.moderatorUid)}
                                 variant="destructive"
                                 size="sm"
                                 disabled={deleteLoading}
@@ -993,10 +934,10 @@ export default function ModeratorExamsViewPage() {
                               disabled={!editingExam?.topic || subtopicOptions.length === 0}
                             >
                               <SelectTrigger className="h-8 w-[120px] text-xs">
-                                <SelectValue placeholder="Бүх дэд бүлэг" />
+                                <SelectValue placeholder="Сонгох" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">Бүх дэд бүлэг</SelectItem>
+                                <SelectItem value="all">Сонгохгүй</SelectItem>
                                 {subtopicOptions.map(subtopic => (
                                   <SelectItem key={subtopic.id} value={subtopic.name}>{subtopic.name}</SelectItem>
                                 ))}
@@ -1071,7 +1012,7 @@ export default function ModeratorExamsViewPage() {
                       </td>
                       <td className="pr-2 py-1 font-semibold">Үүсгэсэн огноо:</td>
                       <td className="py-1">
-                        {selectedExam.createdAt instanceof Date ? selectedExam.createdAt.toLocaleDateString() + ' ' + selectedExam.createdAt.toLocaleTimeString() : '-'}
+                        {convertToDate(selectedExam.createdAt)?.toLocaleDateString() + ' ' + convertToDate(selectedExam.createdAt)?.toLocaleTimeString() || '-'}
                       </td>
                     </tr>
                   </tbody>
@@ -1154,52 +1095,42 @@ export default function ModeratorExamsViewPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Шалгалт устгах баталгаажуулах цонх */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Та үнэхээр устгахдаа итгэлтэй байна уу?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Энэ үйлдлийг буцаах боломжгүй. Энэ нь таны шалгалтын мэдээллийг Firebase-ээс бүр мөсөн устгана.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => { setIsDeleteDialogOpen(false); setExamToActOn(null); }}>Цуцлах</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteExam} className="bg-red-600 hover:bg-red-700">
+                      Устгах
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Устгах баталгаажуулах Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Шалгалтыг устгах</DialogTitle>
-            <DialogDescription>
-              Та &quot;{selectedExam?.title}&quot; шалгалтыг устгахдаа итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжгүй!
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={deleteLoading}>
-              Цуцлах
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteExam} disabled={deleteLoading}>
-              {deleteLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Устгах
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Архивлах/Архиваас гаргах баталгаажуулах Dialog */}
-      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {examToArchive?.currentStatus === 'archived' ? 'Шалгалтыг архиваас гаргах' : 'Шалгалтыг архивлах'}
-            </DialogTitle>
-            <DialogDescription>
-              {examToArchive?.currentStatus === 'archived'
-                ? `Та "${selectedExam?.title}" шалгалтыг архиваас гаргаж идэвхтэй болгохдоо итгэлтэй байна уу?`
-                : `Та "${selectedExam?.title}" шалгалтыг архивлахдаа итгэлтэй байна уу?`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={archiveLoading}>
-              Цуцлах
-            </Button>
-            <Button onClick={confirmToggleArchive} disabled={archiveLoading}>
-              {archiveLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {examToArchive?.currentStatus === 'archived' ? 'Архиваас гаргах' : 'Архивлах'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Шалгалт архивлах/архиваас гаргах баталгаажуулах цонх */}
+      <AlertDialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Та үнэхээр төлөвийг өөрчлөхдөө итгэлтэй байна уу?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      {examToActOn?.status === 'archived' ? 'Та энэ шалгалтыг архиваас гаргаж идэвхтэй болгох гэж байна.' : 'Та энэ шалгалтыг архивлах гэж байна. Энэ нь хэрэглэгчдэд харагдахгүй болно.'}
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => { setIsArchiveDialogOpen(false); setExamToActOn(null); }}>Цуцлах</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleToggleArchive}>
+                      {examToActOn?.status === 'archived' ? 'Архиваас гаргах' : 'Архивлах'}
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

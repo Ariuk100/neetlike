@@ -1,0 +1,207 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Хэрэглэгч нэвтэрсэн эсэхийг шалгах функц
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Хэрэглэгч тухайн ролтэй эсэхийг шалгах функц (Custom Claims-аас ролийг авна)
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    // Хэрэглэгч тодорхой ролуудын аль нэгэнд багтаж байгаа эсэхийг шалгах функц
+    function hasAnyRole(roles) {
+      return isAuthenticated() && roles.hasAny(request.auth.token.role);
+    }
+
+    // Role-ийн тусгай функцууд
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    function isModerator() {
+      return hasRole('moderator');
+    }
+    function isTeacher() {
+      return hasRole('teacher');
+    }
+    function isStudent() {
+      return hasRole('student');
+    }
+
+    // --- 1. users collection ---
+    // Энэ collection-д хэрэглэгчийн мэдээлэл болон ролийг хадгална.
+    match /users/{userId} {
+      // Бүх нэвтэрсэн хэрэглэгч өөрийнхөө мэдээллийг унших боломжтой.
+      // Админ, багш, модератор бусад хэрэглэгчийн мэдээллийг унших боломжтой.
+      allow read: if request.auth.uid == userId || isAdmin() || isTeacher() || isModerator();
+      
+      // Хэрэглэгч өөрийн user document-ийг үүсгэх (ихэвчлэн бүртгүүлэх үед)
+      allow create: if request.auth.uid == userId;
+      
+      // Хэрэглэгч өөрийнхөө мэдээллийг шинэчлэх. Админ дурын хэрэглэгчийн мэдээллийг шинэчлэх.
+      allow update: if request.auth.uid == userId || isAdmin();
+      
+      // Зөвхөн админ хэрэглэгч устгах боломжтой.
+      allow delete: if isAdmin();
+    }
+
+    // --- 2. test collection ---
+    // Тестийн асуултууд хадгалагдах collection.
+    match /test/{testId} {
+      // Бүх нэвтэрсэн хэрэглэгч тестыг унших боломжтой.
+      allow read: if isAuthenticated(); 
+
+      // Тест үүсгэх: Зөвхөн багш, админ, модератор үүсгэж болно.
+      allow create: if isTeacher() || isAdmin() || isModerator();
+
+      // Тест шинэчлэх:
+      // Админ дурын тестыг шинэчлэх боломжтой.
+      // Модератор зөвхөн өөрийн үүсгэсэн тестыг шинэчлэх боломжтой (resource.data.moderatorUid нь өөрийн UID-тэй таарч байвал).
+      allow update: if isAdmin() || (isModerator() && request.auth.uid == resource.data.moderatorUid);
+
+      // Тест устгах: Зөвхөн админ устгах боломжтой.
+      allow delete: if isAdmin();
+
+      // Тестийн доорх дэд цуглуулгууд (хэрэв байгаа бол):
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isTeacher() || isAdmin() || isModerator();
+      }
+    }
+
+    // --- 3. subjects collection ---
+    // Хичээлүүдийн нэр хадгалагдах collection.
+    match /subjects/{subjectId} {
+      // Бүх нэвтэрсэн хэрэглэгч хичээлүүдийг унших боломжтой.
+      allow read: if isAuthenticated();
+      // Зөвхөн админ, модератор хичээл үүсгэх, шинэчлэх, устгах боломжтой.
+      allow write: if isAdmin() || isModerator(); 
+    }
+
+    // --- 4. chapters collection ---
+    // Бүлгүүдийн мэдээлэл хадгалагдах collection.
+    match /chapters/{chapterId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin(); // Зөвхөн админ үүсгэх, устгах боломжтой
+      allow update: if isAdmin() || (
+        // Модератор зөвхөн problemCount эсвэл quizCount-ийг нэгээр нэмэгдүүлэх боломжтой
+        isModerator() && (
+          (request.resource.data.keys().hasAll(['problemCount']) && request.resource.data.problemCount == resource.data.problemCount + 1) ||
+          (request.resource.data.keys().hasAll(['quizCount']) && request.resource.data.quizCount == resource.data.quizCount + 1)
+        )
+      );
+
+      // Дэд цуглуулгууд (хэрэв байгаа бол)
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin(); // Зөвхөн админ бичих боломжтой
+      }
+    }
+
+    // --- 5. subchapters collection ---
+    // Дэд бүлгүүдийн мэдээлэл хадгалагдах collection.
+    match /subchapters/{subchapterId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin(); // Зөвхөн админ үүсгэх, устгах боломжтой
+      allow update: if isAdmin() || (
+        // Модератор зөвхөн problemCount эсвэл quizCount-ийг нэгээр нэмэгдүүлэх боломжтой
+        isModerator() && (
+          (request.resource.data.keys().hasAll(['problemCount']) && request.resource.data.problemCount == resource.data.problemCount + 1) ||
+          (request.resource.data.keys().hasAll(['quizCount']) && request.resource.data.quizCount == resource.data.quizCount + 1)
+        )
+      );
+
+      // Дэд цуглуулгууд (хэрэв байгаа бол)
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin(); // Зөвхөн админ бичих боломжтой
+      }
+    }
+
+    // --- 6. topics collection (chapters-ээс тусад нь ашиглагдаж байгаа бол) ---
+    // Сэдвүүдийн нэр хадгалагдах collection.
+    match /topics/{topicId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+
+      // 'subtopics' subcollection
+      // Дэд сэдвүүдийн нэр хадгалагдах collection.
+      match /subtopics/{subtopicId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    // --- 7. lessons collection (давхардлыг нэгтгэсэн) ---
+    match /lessons/{lessonId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isModerator();
+      allow update, delete: if isAdmin() || isModerator();
+
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin() || isModerator();
+      }
+    }
+
+    // --- 8. assignments collection ---
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    // --- 9. videos collection ---
+    match /videos/{videoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    // --- 10. problems collection (давхардлыг нэгтгэсэн) ---
+    match /problems/{problemId} {
+      allow read: if isAuthenticated();
+      allow create: if isModerator(); // Зөвхөн модераторууд шинэ бодлого нэмэх боломжтой
+      allow update, delete: if isModerator(); // Зөвхөн модераторууд бодлогыг шинэчлэх, устгах боломжтой
+
+      match /{subpath=**} {
+        allow read: if isAuthenticated();
+        allow write: if isModerator(); // Зөвхөн модераторууд дэд цуглуулгад бичих боломжтой
+      }
+    }
+    
+    // --- 11. exams collection (Шинээр нэмсэн) ---
+    match /exams/{examId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isModerator();
+      allow update, delete: if isAdmin() || isModerator();
+
+      match /{subpath=**} {
+        allow read: if (isAuthenticated()); // Энд алдааг зассан
+        allow write: if (isAdmin() || isModerator()); // Энд алдааг зассан
+      }
+    }
+
+    // --- 12. stats/global (жишээ) ---
+    match /stats/global {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // --- 13. Fallback (Бусад бүх хандалтыг хориглоно) ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

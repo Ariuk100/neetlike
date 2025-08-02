@@ -1,4 +1,4 @@
-// TeacherTestPage.tsx
+// moderator/tests/create/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -439,7 +439,7 @@ export default function TeacherTestPage() {
                     <SelectValue placeholder="Bloom&apos;s" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="МЭДЭХ">МЭДЭХ</SelectItem>
+                    <SelectItem value="СЭРГЭЭН САНАХ">СЭРГЭЭН САНАХ</SelectItem>
                     <SelectItem value="ОЙЛГОХ">ОЙЛГОХ</SelectItem>
                     <SelectItem value="ХЭРЭГЛЭХ">ХЭРЭГЛЭХ</SelectItem>
                     <SelectItem value="ЗАДЛАН ШИНЖЛЭХ">ЗАДЛАН ШИНЖЛЭХ</SelectItem>

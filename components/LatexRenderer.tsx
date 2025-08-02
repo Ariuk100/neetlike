@@ -1,3 +1,4 @@
+//components/LatexRenderer.tsx
 'use client'
 
 import 'katex/dist/katex.min.css'

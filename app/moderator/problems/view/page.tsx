@@ -1,3 +1,4 @@
+// moderator/problems/view/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -11,7 +12,7 @@ import {
   startAfter,
   getDocs,
   where,
-  deleteDoc,
+  deleteDoc, // <--- Шинэ: Бодлого устгах функц
   DocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -41,13 +42,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Edit, Save, XCircle, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Edit, Save, XCircle, Loader2, Trash2 } from 'lucide-react'; // <--- Шинэ: Trash2 икон
 import Image from 'next/image';
 import LatexRenderer from '@/components/LatexRenderer';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,34 +60,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { toast } from 'sonner'; // <--- Шинэ: sonner-ийн toast импорт
+} from '@/components/ui/alert-dialog'; // <--- Шинэ: AlertDialog компонентууд
 
 const NEXT_PUBLIC_R2_ACCOUNT_ID = process.env.NEXT_PUBLIC_R2_ACCOUNT_ID;
 
-interface TestData {
+interface ProblemData {
   id: string;
-  questionNumber: number;
-  questionText: string;
+  title: string;
+  problemText: string;
   moderatorUid: string;
   moderatorName?: string;
-  questionType?: string;
-  options?: string[];
-  correctAnswer?: string;
+  problemType?: string;
   difficulty?: string;
   tags?: string[];
+  references?: string;
   createdAt?: Date;
-  questionImage?: string | null;
-  optionImages?: (string | null)[];
-  explanation?: string;
-  explanationImage?: string | null;
+  problemImage?: string | null;
+  solutionText?: string;
+  solutionImage?: string | null;
   subject?: string;
   topic?: string | null;
   subtopic?: string | null;
-  bloom?: string;
-  source?: string;
   score?: number;
-  timeLimit?: number;
+  correctAnswerInput?: string; // Шинэчлэгдсэн: correctAnswerInput нэмсэн
+  answerHint?: string; // Шинэчлэгдсэн: answerHint нэмсэн
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
@@ -121,18 +119,17 @@ const getR2PublicImageUrl = (imageKey?: string | null): string | null => {
 };
 
 
-export default function ModeratorTestsViewPage() {
+export default function ModeratorProblemsViewPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [tests, setTests] = useState<TestData[]>([]);
-  const [loadingTests, setLoadingTests] = useState(true);
-  const [selectedTest, setSelectedTest] = useState<TestData | null>(null);
+  const [problems, setProblems] = useState<ProblemData[]>([]);
+  const [loadingProblems, setLoadingProblems] = useState(true);
+  const [selectedProblem, setSelectedProblem] = useState<ProblemData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [itemsPerPage, setItemsPerPage] = useState(10);// eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [firstVisible, setFirstVisible] = useState<DocumentSnapshot | null>(null);
@@ -144,24 +141,22 @@ export default function ModeratorTestsViewPage() {
   const orderedPageSnapshots = useRef<DocumentSnapshot[]>([]);
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editingTest, setEditingTest] = useState<TestData | null>(null);
+  const [editingProblem, setEditingProblem] = useState<ProblemData | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
 
   const [selectedModerator, setSelectedModerator] = useState<string>('all');
-  const [selectedBloom, setSelectedBloom] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [selectedProblemType, setSelectedProblemType] = useState<string>('all');
   const [selectedTopic, setSelectedTopic] = useState<string>('all');
   const [selectedSubtopic, setSelectedSubtopic] = useState<string>('all');
 
   const [moderatorOptions, setModeratorOptions] = useState<{ uid: string; name: string }[]>([]);
-  const [difficultyOptions] = useState<string[]>(['Хялбар', 'Дунд', 'Хүнд']);
-  const [bloomOptions] = useState<string[]>([
-    'СЭРГЭЭН САНАХ',
-    'ОЙЛГОХ',
-    'ХЭРЭГЛЭХ',
-    'ЗАДЛАН ШИНЖЛЭХ',
-    'ҮНЭЛЭХ',
-    'БҮТЭЭХ',
+  const [difficultyOptions] = useState<string[]>(['Амархан', 'Дунд', 'Хүнд']);
+  const [problemTypeOptions] = useState<string[]>([
+    'Дасгал бодлого',
+    'Олимпиадын бодлого',
+    'Түгээмэл бодлого',
+    'Сонирхолтой бодлого',
   ]);
   const [topicOptions, setTopicOptions] = useState<FilterOption[]>([]);
   const [subtopicOptions, setSubtopicOptions] = useState<FilterOption[]>([]);
@@ -206,6 +201,7 @@ export default function ModeratorTestsViewPage() {
 
       } catch (err) {
         console.error("Error fetching filter options:", err);
+        toast.error("Филтерийн сонголтуудыг татахад алдаа гарлаа.");
       }
     };
 
@@ -242,6 +238,7 @@ export default function ModeratorTestsViewPage() {
       } catch (err) {
         console.error("Error fetching subtopics:", err);
         setSubtopicOptions([]);
+        toast.error("Дэд бүлгүүдийг татахад алдаа гарлаа.");
       }
     };
 
@@ -251,28 +248,28 @@ export default function ModeratorTestsViewPage() {
   }, [db, selectedTopic, topicOptions]);
 
 
-  const fetchTests = useCallback(async () => {
+  const fetchProblems = useCallback(async () => {
     if (!db || !user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
-      setLoadingTests(false);
+      setLoadingProblems(false);
       return;
     }
 
-    setLoadingTests(true);
+    setLoadingProblems(true);
     setError(null);
-    setTests([]);
-    setSelectedTest(null);
+    setProblems([]);
+    setSelectedProblem(null);
 
-    const testsColRef = collection(db, 'test');
-    let baseQuery = query(testsColRef, orderBy('questionNumber', 'asc'));
+    const problemsColRef = collection(db, 'problems');
+    let baseQuery = query(problemsColRef, orderBy('createdAt', 'desc'));
 
     if (selectedModerator !== 'all') {
       baseQuery = query(baseQuery, where('moderatorUid', '==', selectedModerator));
     }
-    if (selectedBloom !== 'all') {
-      baseQuery = query(baseQuery, where('bloom', '==', selectedBloom));
-    }
     if (selectedDifficulty !== 'all') {
       baseQuery = query(baseQuery, where('difficulty', '==', selectedDifficulty));
+    }
+    if (selectedProblemType !== 'all') {
+      baseQuery = query(baseQuery, where('problemType', '==', selectedProblemType));
     }
     if (selectedTopic !== 'all') {
       baseQuery = query(baseQuery, where('topic', '==', selectedTopic));
@@ -297,49 +294,46 @@ export default function ModeratorTestsViewPage() {
 
     try {
       const snapshot = await getDocs(paginatedQuery);
-      const fetchedTests: TestData[] = [];
+      const fetchedProblems: ProblemData[] = [];
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        const testItem: TestData = {
+        const problemItem: ProblemData = {
           id: docSnap.id,
-          questionNumber: data.questionNumber || 0,
-          questionText: data.question || 'Асуултын текст байхгүй',
+          title: data.title || 'Гарчиггүй',
+          problemText: data.problemText || 'Бодлогын текст байхгүй',
           moderatorUid: data.moderatorUid || 'Үл мэдэгдэх UID',
-          questionType: data.answerType as string | undefined,
-          options: (Array.isArray(data.options) ? data.options.map(String) : []) as string[],
-          correctAnswer: data.correctAnswer as string | undefined,
+          problemType: data.problemType as string | undefined,
           difficulty: data.difficulty as string | undefined,
           tags: (Array.isArray(data.tags) ? data.tags.map(String) : []) as string[],
+          references: data.references as string | undefined,
           createdAt: convertToDate(data.createdAt),
-          questionImage: data.questionImage as string | null,
-          optionImages: (Array.isArray(data.optionImages) ? data.optionImages.map(String) : []) as (string | null)[],
-          explanation: data.explanation as string | undefined,
-          explanationImage: data.explanationImage as string | null,
+          problemImage: data.problemImage as string | null,
+          solutionText: data.solutionText as string | undefined,
+          solutionImage: data.solutionImage as string | null,
           subject: data.subject as string | undefined,
           topic: (data.topic as string | null) || null,
           subtopic: (data.subtopic as string | null) || null,
-          bloom: data.bloom as string | undefined,
-          source: data.source as string | undefined,
           score: data.score as number | undefined,
-          timeLimit: data.timeLimit as number | undefined,
+          correctAnswerInput: data.correctAnswerInput as string | undefined,
+          answerHint: data.answerHint as string | undefined,
           ...Object.fromEntries(Object.entries(data).filter(([key]) => !(key in {
-            id: true, questionNumber: true, question: true, moderatorUid: true, answerType: true,
-            options: true, correctAnswer: true, difficulty: true, tags: true, createdAt: true,
-            questionImage: true, optionImages: true, explanation: true, explanationImage: true,
-            subject: true, topic: true, subtopic: true, bloom: true, source: true, score: true, timeLimit: true
+            id: true, title: true, problemText: true, moderatorUid: true, problemType: true,
+            difficulty: true, tags: true, references: true, createdAt: true, problemImage: true,
+            solutionText: true, solutionImage: true, subject: true, topic: true, subtopic: true, score: true,
+            correctAnswerInput: true, answerHint: true
           })))
         };
-        fetchedTests.push(testItem);
+        fetchedProblems.push(problemItem);
       });
 
       const moderatorNamesMap = new Map<string, string>();
       moderatorOptions.forEach(mod => moderatorNamesMap.set(mod.uid, mod.name));
-      const testsWithNames = fetchedTests.map(test => ({
-        ...test,
-        moderatorName: moderatorNamesMap.get(test.moderatorUid) || test.moderatorUid.substring(0, 8) + '...'
+      const problemsWithNames = fetchedProblems.map(problem => ({
+        ...problem,
+        moderatorName: moderatorNamesMap.get(problem.moderatorUid) || problem.moderatorUid.substring(0, 8) + '...'
       }));
 
-      setTests(testsWithNames);
+      setProblems(problemsWithNames);
 
       if (snapshot.docs.length > 0) {
         newFirstVisible = snapshot.docs[0];
@@ -363,37 +357,37 @@ export default function ModeratorTestsViewPage() {
 
       setIsFirstPage(currentPage === 1);
 
-      if (totalItemsCount === null || selectedModerator !== 'all' || selectedBloom !== 'all' || selectedDifficulty !== 'all' || selectedTopic !== 'all' || selectedSubtopic !== 'all') {
+      if (totalItemsCount === null || selectedModerator !== 'all' || selectedDifficulty !== 'all' || selectedProblemType !== 'all' || selectedTopic !== 'all' || selectedSubtopic !== 'all') {
         const totalSnapshot = await getDocs(baseQuery);
         setTotalItemsCount(totalSnapshot.size);
       }
 
     } catch (err) {
-      console.error("Error fetching tests:", err);
-      setError("Тестүүдийг татахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
+      console.error("Error fetching problems:", err);
+      setError("Бодлогуудыг татахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
     } finally {
-      setLoadingTests(false);
+      setLoadingProblems(false);
     }
-  }, [currentPage, itemsPerPage, user, selectedModerator, selectedBloom, selectedDifficulty, selectedTopic, selectedSubtopic, moderatorOptions, totalItemsCount]);
+  }, [currentPage, itemsPerPage, user, selectedModerator, selectedDifficulty, selectedProblemType, selectedTopic, selectedSubtopic, moderatorOptions, totalItemsCount]);
 
   useEffect(() => {
-    fetchTests();
-  }, [currentPage, itemsPerPage, selectedModerator, selectedBloom, selectedDifficulty, selectedTopic, selectedSubtopic, fetchTests]);
+    fetchProblems();
+  }, [currentPage, itemsPerPage, selectedModerator, selectedDifficulty, selectedProblemType, selectedTopic, selectedSubtopic, fetchProblems]);
 
   useEffect(() => {
     pageCache.current.clear();
     orderedPageSnapshots.current = [];
     setTotalItemsCount(null);
     setCurrentPage(1);
-    setSelectedTest(null);
+    setSelectedProblem(null);
     setIsEditing(false);
-  }, [selectedModerator, selectedBloom, selectedDifficulty, selectedTopic, selectedSubtopic]);
+  }, [selectedModerator, selectedDifficulty, selectedProblemType, selectedTopic, selectedSubtopic]);
 
 
   const totalPages = totalItemsCount ? Math.ceil(totalItemsCount / itemsPerPage) : 1;
 
   const handlePageChange = (direction: 'prev' | 'next') => {
-    if (loadingTests) return;
+    if (loadingProblems) return;
 
     if (direction === 'next') {
         if (!isLastPage) {
@@ -404,7 +398,7 @@ export default function ModeratorTestsViewPage() {
             setCurrentPage(prev => Math.max(1, prev - 1));
         }
     }
-    setSelectedTest(null);
+    setSelectedProblem(null);
     setIsEditing(false);
   };
 
@@ -414,37 +408,40 @@ export default function ModeratorTestsViewPage() {
     orderedPageSnapshots.current = [];
     setTotalItemsCount(null);
     setCurrentPage(1);
-    setSelectedTest(null);
+    setSelectedProblem(null);
     setIsEditing(false);
   }, []);
 
-  const handleSaveTest = async (testToSave: TestData) => {
+  const handleSaveProblem = async (problemToSave: ProblemData) => {
     if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
+      setError("Хадгалах эрх байхгүй байна.");
       toast.error("Хадгалах эрх байхгүй байна.");
       return;
     }
-    if (user.role === 'moderator' && testToSave.moderatorUid !== user.uid) {
-        toast.error("Та зөвхөн өөрийн үүсгэсэн тестыг засварлах боломжтой.");
+    if (user.role === 'moderator' && problemToSave.moderatorUid !== user.uid) {
+        setError("Та зөвхөн өөрийн үүсгэсэн бодлогыг засварлах боломжтой.");
+        toast.error("Та зөвхөн өөрийн үүсгэсэн бодлогыг засварлах боломжтой.");
         return;
     }
 
-    if (!testToSave.id) {
-      toast.error("Засах тестийн ID олдсонгүй.");
+    if (!problemToSave.id) {
+      setError("Засах бодлогын ID олдсонгүй.");
+      toast.error("Засах бодлогын ID олдсонгүй.");
       return;
     }
 
     setSaveLoading(true);
     try {
-      const testRef = doc(db, 'test', testToSave.id);
-      const originalTest = tests.find(t => t.id === testToSave.id);
+      const problemRef = doc(db, 'problems', problemToSave.id);
+      const originalProblem = problems.find(p => p.id === problemToSave.id);
 
-      const updatedFields: Partial<TestData> = {};
+      const updatedFields: Partial<ProblemData> = {};
 
-      for (const key of Object.keys(testToSave) as Array<keyof TestData>) {
+      for (const key of Object.keys(problemToSave) as Array<keyof ProblemData>) {
         if (key === 'id' || key === 'moderatorName' || key === 'createdAt') continue;
 
-        const valueToSave = testToSave[key];
-        const originalValue = originalTest?.[key];
+        const valueToSave = problemToSave[key];
+        const originalValue = originalProblem?.[key];
 
         if (valueToSave instanceof Date) {
           if (originalValue instanceof Date) {
@@ -455,7 +452,9 @@ export default function ModeratorTestsViewPage() {
             updatedFields[key] = valueToSave;
           }
         } else if (Array.isArray(valueToSave)) {
-          if (!arraysEqual(valueToSave, originalValue as (string | null)[])) {
+          const sortedValueToSave = [...valueToSave].sort();
+          const sortedOriginalValue = Array.isArray(originalValue) ? [...originalValue].sort() : [];
+          if (!arraysEqual(sortedValueToSave, sortedOriginalValue)) {
             updatedFields[key] = valueToSave;
           }
         } else {
@@ -469,57 +468,59 @@ export default function ModeratorTestsViewPage() {
       }
 
       if (Object.keys(updatedFields).length > 0) {
-        await updateDoc(testRef, updatedFields);
-        toast.success("Тест амжилттай хадгалагдлаа!");
+        await updateDoc(problemRef, updatedFields);
+        toast.success("Бодлого амжилттай хадгалагдлаа!");
       } else {
-        toast("Өөрчлөгдсөн зүйл байхгүй тул хадгалах шаардлагагүй.");
+        toast.info("Өөрчлөгдсөн зүйл байхгүй тул хадгалах шаардлагагүй.");
       }
 
       setIsEditing(false);
       setSaveLoading(false);
-      setTests(prevTests => prevTests.map(test => test.id === testToSave.id ? testToSave : test));
-      setSelectedTest(testToSave);
+      setProblems(prevProblems => prevProblems.map(problem => problem.id === problemToSave.id ? problemToSave : problem));
+      setSelectedProblem(problemToSave);
 
     } catch (err: unknown) {
-      console.error("Тест хадгалахад алдаа гарлаа:", err);
-      setError("Тест хадгалахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
-      toast.error("Тест хадгалахад алдаа гарлаа: " + (err instanceof Error ? err.message : "Үл мэдэгдэх алдаа"));
+      console.error("Бодлого хадгалахад алдаа гарлаа:", err);
+      setError("Бодлого хадгалахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
+      toast.error("Бодлого хадгалахад алдаа гарлаа.");
       setSaveLoading(false);
     }
   };
-
-  const handleDeleteTest = async (testId: string) => {
+  
+  // ---> Устгах функц
+  const handleDeleteProblem = async (problemId: string) => {
     if (!user || !(user.role && ['moderator', 'admin'].includes(user.role))) {
-      toast.error("Устгах эрх байхгүй байна.");
-      return;
+        toast.error("Устгах эрх байхгүй байна.");
+        return;
     }
 
-    const testToDelete = tests.find(t => t.id === testId);
-    if (!testToDelete) {
-      toast.error("Устгах тест олдсонгүй.");
-      return;
+    const problemToDelete = problems.find(p => p.id === problemId);
+    if (!problemToDelete) {
+        toast.error("Устгах бодлого олдсонгүй.");
+        return;
     }
 
-    if (user.role === 'moderator' && testToDelete.moderatorUid !== user.uid) {
-      toast.error("Та зөвхөн өөрийн үүсгэсэн тестыг устгах боломжтой.");
-      return;
+    if (user.role === 'moderator' && problemToDelete.moderatorUid !== user.uid) {
+        toast.error("Та зөвхөн өөрийн үүсгэсэн бодлогыг устгах боломжтой.");
+        return;
     }
 
     try {
-      await deleteDoc(doc(db, 'test', testId));
-      toast.success("Тест амжилттай устгагдлаа!");
+        await deleteDoc(doc(db, 'problems', problemId));
+        toast.success("Бодлого амжилттай устгагдлаа!");
 
-      setTests(prevTests => prevTests.filter(test => test.id !== testId));
-      setSelectedTest(null);
+        setProblems(prevProblems => prevProblems.filter(problem => problem.id !== problemId));
+        setSelectedProblem(null);
 
-      setTotalItemsCount(prevCount => (prevCount !== null ? prevCount - 1 : null));
+        setTotalItemsCount(prevCount => (prevCount !== null ? prevCount - 1 : null));
 
     } catch (err: unknown) {
-      console.error("Тест устгахад алдаа гарлаа:", err);
-      setError("Тест устгахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
-      toast.error("Тест устгахад алдаа гарлаа.");
+        console.error("Бодлого устгахад алдаа гарлаа:", err);
+        setError("Бодлого устгахад алдаа гарлаа: " + (err instanceof Error ? err.message : String(err)));
+        toast.error("Бодлого устгахад алдаа гарлаа.");
     }
-  };
+};
+  // <--- Устгах функц дуусна
 
   const arraysEqual = (a: (string | null)[], b: (string | null)[]): boolean => {
     if (a.length !== b.length) return false;
@@ -550,8 +551,8 @@ export default function ModeratorTestsViewPage() {
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-80px)] p-4 gap-4 bg-gray-50">
       <Card className="w-full md:w-2/5 lg:w-1/3 flex flex-col">
         <CardHeader>
-          <CardTitle className="text-center">Тестийн жагсаалт</CardTitle>
-          <CardDescription className="text-center">Бүх тестүүдийн жагсаалт болон хуудаслалт.</CardDescription>
+          <CardTitle className="text-center">Бодлогын жагсаалт</CardTitle>
+          <CardDescription className="text-center">Бүх бодлогын жагсаалт болон хуудаслалт.</CardDescription>
         </CardHeader>
         <CardContent className="flex-grow overflow-hidden p-0">
           {error && (
@@ -559,15 +560,14 @@ export default function ModeratorTestsViewPage() {
               Алдаа: {error}
             </div>
           )}
-          {loadingTests ? (
+          {loadingProblems ? (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-450px)]">
               <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-              <p className="text-sm text-gray-500 mt-2">Тестүүдийг ачаалж байна...</p>
+              <p className="text-sm text-gray-500 mt-2">Бодлогуудыг ачаалж байна...</p>
               <Skeleton className="h-[200px] w-[90%] mt-4" />
             </div>
           ) : (
             <>
-              {/* Филтер хэсэг */}
               <div className="p-4 border-b">
                 <div className="mb-2">
                   <Label htmlFor="moderator-filter" className="text-sm">Модератор:</Label>
@@ -583,7 +583,6 @@ export default function ModeratorTestsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Бүлэг филтер */}
                 <div className="mb-2">
                   <Label htmlFor="topic-filter" className="text-sm">Бүлэг:</Label>
                   <Select value={selectedTopic} onValueChange={setSelectedTopic}>
@@ -598,7 +597,6 @@ export default function ModeratorTestsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Дэд бүлэг филтер */}
                 <div className="mb-2">
                   <Label htmlFor="subtopic-filter" className="text-sm">Дэд бүлэг:</Label>
                   <Select
@@ -617,17 +615,16 @@ export default function ModeratorTestsViewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Блүүмийн түвшин филтер */}
                 <div className="mb-2">
-                  <Label htmlFor="bloom-filter" className="text-sm">Блүүмийн түвшин:</Label>
-                  <Select value={selectedBloom} onValueChange={setSelectedBloom}>
+                  <Label htmlFor="problem-type-filter" className="text-sm">Бодлогын төрөл:</Label>
+                  <Select value={selectedProblemType} onValueChange={setSelectedProblemType}>
                     <SelectTrigger className="w-full text-xs h-8">
-                      <SelectValue placeholder="Бүх түвшин" />
+                      <SelectValue placeholder="Бүх төрөл" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Бүх түвшин</SelectItem>
-                      {bloomOptions.map(bloom => (
-                        <SelectItem key={bloom} value={bloom}>{bloom}</SelectItem>
+                      <SelectItem value="all">Бүх төрөл</SelectItem>
+                      {problemTypeOptions.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -649,12 +646,12 @@ export default function ModeratorTestsViewPage() {
                 <Button
                   onClick={() => {
                     setSelectedModerator('all');
-                    setSelectedBloom('all');
                     setSelectedDifficulty('all');
+                    setSelectedProblemType('all');
                     setSelectedTopic('all');
                     setSelectedSubtopic('all');
                     setCurrentPage(1);
-                    setSelectedTest(null);
+                    setSelectedProblem(null);
                     setIsEditing(false);
                   }}
                   variant="outline"
@@ -665,33 +662,33 @@ export default function ModeratorTestsViewPage() {
                 </Button>
               </div>
 
-              {tests.length === 0 && !loadingTests ? (
-                <p className="p-4 text-center text-gray-500">Тест олдсонгүй.</p>
+              {problems.length === 0 && !loadingProblems ? (
+                <p className="p-4 text-center text-gray-500">Бодлого олдсонгүй.</p>
               ) : (
                 <ScrollArea className="h-[calc(100vh-450px)]">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[80px]">Дугаар</TableHead>
-                        <TableHead>Асуулт</TableHead>
+                        <TableHead className="w-[80px]">Гарчиг</TableHead>
+                        <TableHead>Бодлого</TableHead>
                         <TableHead className="w-[120px]">Модератор</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tests.map((test) => (
+                      {problems.map((problem) => (
                         <TableRow
-                          key={test.id}
+                          key={problem.id}
                           onClick={() => {
-                            setSelectedTest(test);
+                            setSelectedProblem(problem);
                             setIsEditing(false);
                           }}
                           className={`cursor-pointer hover:bg-gray-100 ${
-                            selectedTest?.id === test.id ? 'bg-blue-50' : ''
+                            selectedProblem?.id === problem.id ? 'bg-blue-50' : ''
                           }`}
                         >
-                          <TableCell className="font-medium">{String(test.questionNumber)}</TableCell>
-                          <TableCell className="max-w-[200px] truncate text-sm"><LatexRenderer text={test.questionText} /></TableCell>
-                          <TableCell className="truncate text-sm">{test.moderatorName}</TableCell>
+                          <TableCell className="font-medium">{problem.title}</TableCell>
+                          <TableCell className="max-w-[200px] truncate text-sm"><LatexRenderer text={problem.problemText} /></TableCell>
+                          <TableCell className="truncate text-sm">{problem.moderatorName}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -717,7 +714,7 @@ export default function ModeratorTestsViewPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange('prev')}
-                    disabled={isFirstPage || loadingTests}
+                    disabled={isFirstPage || loadingProblems}
                     className="h-8 text-xs"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -729,7 +726,7 @@ export default function ModeratorTestsViewPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange('next')}
-                    disabled={isLastPage || totalPages === 0 || loadingTests}
+                    disabled={isLastPage || totalPages === 0 || loadingProblems}
                     className="h-8 text-xs"
                   >
                     <ArrowRight className="h-4 w-4" />
@@ -743,89 +740,111 @@ export default function ModeratorTestsViewPage() {
 
       <Card className="flex w-full flex-col md:w-3/5 lg:w-2/3">
         <CardHeader>
-          <CardTitle className="text-center">Сонгосон тестийн дэлгэрэнгүй мэдээлэл</CardTitle>
-          <CardDescription className="text-center">Сонгосон тестийн бүх талбарууд.</CardDescription>
+          <CardTitle className="text-center">Сонгосон бодлогын дэлгэрэнгүй мэдээлэл</CardTitle>
+          <CardDescription className="text-center">Сонгосон бодлогын бүх талбарууд.</CardDescription>
         </CardHeader>
         <CardContent className="flex-grow overflow-y-auto p-4">
-          {!selectedTest ? (
+          {!selectedProblem ? (
             <div className="flex h-full items-center justify-center text-gray-500">
-              Дэлгэрэнгүй мэдээлэл харахын тулд зүүн талаас тест сонгоно уу.
+              Дэлгэрэнгүй мэдээлэл харахын тулд зүүн талаас бодлого сонгоно уу.
             </div>
           ) : (
             <div className="space-y-4">
               <div className="mb-4 flex justify-end gap-2">
-                  {!isEditing ? (
-                      (user && (user.role === 'admin' || (user.role === 'moderator' && selectedTest.moderatorUid === user.uid))) ? (
-                          <>
-                              <Button onClick={() => { setIsEditing(true); setEditingTest({ ...selectedTest }); }} variant="outline" size="sm">
-                                  <Edit className="mr-2 h-4 w-4" /> Засах
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="destructive" size="sm">
-                                    <Trash2 className="mr-2 h-4 w-4" /> Устгах
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Та үнэхээр устгахдаа итгэлтэй байна уу?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Энэ үйлдлийг буцаах боломжгүй. Тест болон түүний бүх холбогдох мэдээлэл бүрмөсөн устгагдана.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Цуцлах</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => void handleDeleteTest(selectedTest.id)}>
-                                      Үргэлжлүүлэх
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                          </>
-                      ) : (
-                          <Button variant="outline" size="sm" disabled>
-                              <Edit className="mr-2 h-4 w-4" /> Засах боломжгүй
+                {!isEditing ? (
+                  (user && (user.role === 'admin' || (user.role === 'moderator' && selectedProblem.moderatorUid === user.uid))) ? (
+                    <>
+                      <Button onClick={() => { setIsEditing(true); setEditingProblem({ ...selectedProblem }); }} variant="outline" size="sm">
+                        <Edit className="mr-2 h-4 w-4" /> Засах
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="mr-2 h-4 w-4" /> Устгах
                           </Button>
-                      )
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Та үнэхээр устгахдаа итгэлтэй байна уу?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Энэ үйлдлийг буцаах боломжгүй. Бодлого болон түүний бүх холбогдох мэдээлэл бүрмөсөн устгагдана.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Цуцлах</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => void handleDeleteProblem(selectedProblem.id)}>
+                              Үргэлжлүүлэх
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
                   ) : (
-                      <div className="space-x-2">
-                          <Button onClick={() => {
-                              if (editingTest) {
-                                  void handleSaveTest(editingTest);
-                              }
-                          }} disabled={saveLoading} size="sm">
-                              {saveLoading ? 'Хадгалж байна...' : <><Save className="mr-2 h-4 w-4" /> Хадгалах</>}
-                          </Button>
-                          <Button onClick={() => setIsEditing(false)} variant="ghost" size="sm">
-                              <XCircle className="mr-2 h-4 w-4" /> Цуцлах
-                          </Button>
-                      </div>
-                  )}
+                    <Button variant="outline" size="sm" disabled>
+                      <Edit className="mr-2 h-4 w-4" /> Засах боломжгүй
+                    </Button>
+                  )
+                ) : (
+                  <div className="space-x-2">
+                    <Button onClick={() => {
+                        if (editingProblem) {
+                            void handleSaveProblem(editingProblem);
+                        }
+                    }} disabled={saveLoading} size="sm">
+                        {saveLoading ? 'Хадгалж байна...' : <><Save className="mr-2 h-4 w-4" /> Хадгалах</>}
+                    </Button>
+                    <Button onClick={() => setIsEditing(false)} variant="ghost" size="sm">
+                        <XCircle className="mr-2 h-4 w-4" /> Цуцлах
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="rounded-lg border bg-gray-50 p-3">
                 <table className="w-full text-sm">
                   <tbody>
                     <tr>
-                      <td className="pr-2 py-1 font-semibold">Төрөл:</td>
+                      <td className="pr-2 py-1 font-semibold">Гарчиг:</td>
                       <td className="py-1">
                         {isEditing ? (
                           <Input
                             type="text"
-                            value={editingTest?.questionType || ''}
-                            onChange={(e) => setEditingTest(prev => prev ? { ...prev, questionType: e.target.value } : null)}
+                            value={editingProblem?.title || ''}
+                            onChange={(e) => setEditingProblem(prev => prev ? { ...prev, title: e.target.value } : null)}
                             className="h-8 text-sm"
                           />
                         ) : (
-                          selectedTest.questionType || '-'
+                          selectedProblem.title || '-'
                         )}
                       </td>
+                      <td className="pr-2 py-1 font-semibold">Төрөл:</td>
+                      <td className="py-1">
+                        {isEditing ? (
+                          <Select
+                            value={editingProblem?.problemType || ''}
+                            onValueChange={(value) => setEditingProblem(prev => prev ? { ...prev, problemType: value } : null)}
+                          >
+                            <SelectTrigger className="h-8 w-[120px] text-xs">
+                              <SelectValue placeholder="Сонгох" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {problemTypeOptions.map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          selectedProblem.problemType || '-'
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
                       <td className="pr-2 py-1 font-semibold">Бүлэг:</td>
                       <td className="py-1">
                         {isEditing ? (
                           <Select
-                            value={editingTest?.topic || 'all'}
+                            value={editingProblem?.topic || 'all'}
                             onValueChange={(value) => {
-                              setEditingTest(prev => prev ? { ...prev, topic: value === 'all' ? null : value, subtopic: null } : null)
+                              setEditingProblem(prev => prev ? { ...prev, topic: value === 'all' ? null : value, subtopic: null } : null)
                             }}
                           >
                             <SelectTrigger className="h-8 w-[120px] text-xs">
@@ -839,23 +858,21 @@ export default function ModeratorTestsViewPage() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          selectedTest.topic || '-'
+                          selectedProblem.topic || '-'
                         )}
                       </td>
-                    </tr>
-                    <tr>
                       <td className="pr-2 py-1 font-semibold">Дэд бүлэг:</td>
                       <td className="py-1">
                           {isEditing ? (
                             <Select
-                              value={editingTest?.subtopic || 'all'}
+                              value={editingProblem?.subtopic || 'all'}
                               onValueChange={(value) => {
-                                setEditingTest(prev => prev ? { ...prev, subtopic: value === 'all' ? null : value } : null)
+                                setEditingProblem(prev => prev ? { ...prev, subtopic: value === 'all' ? null : value } : null)
                               }}
-                              disabled={!editingTest?.topic || subtopicOptions.length === 0}
+                              disabled={!editingProblem?.topic || subtopicOptions.length === 0}
                             >
                               <SelectTrigger className="h-8 w-[120px] text-xs">
-                                <SelectValue placeholder="Бүх дэд бүлэг" />
+                                <SelectValue placeholder="Сонгох" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all">Сонгохгүй</SelectItem>
@@ -865,15 +882,17 @@ export default function ModeratorTestsViewPage() {
                               </SelectContent>
                             </Select>
                           ) : (
-                            selectedTest.subtopic || '-'
+                            selectedProblem.subtopic || '-'
                           )}
                       </td>
+                    </tr>
+                    <tr>
                       <td className="pr-2 py-1 font-semibold">Хүндрэл:</td>
                       <td className="py-1">
                         {isEditing ? (
                           <Select
-                            value={editingTest?.difficulty || ''}
-                            onValueChange={(value) => setEditingTest(prev => prev ? { ...prev, difficulty: value } : null)}
+                            value={editingProblem?.difficulty || ''}
+                            onValueChange={(value) => setEditingProblem(prev => prev ? { ...prev, difficulty: value } : null)}
                           >
                             <SelectTrigger className="h-8 w-[120px] text-xs">
                               <SelectValue placeholder="Сонгох" />
@@ -885,43 +904,7 @@ export default function ModeratorTestsViewPage() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          selectedTest.difficulty || '-'
-                        )}
-                      </td>
-                      <td className="pr-2 py-1 font-semibold">Bloom&apos s:</td>
-                      <td className="py-1">
-                        {isEditing ? (
-                          <Select
-                            value={editingTest?.bloom || ''}
-                            onValueChange={(value) => setEditingTest(prev => prev ? { ...prev, bloom: value } : null)}
-                          >
-                            <SelectTrigger className="h-8 w-[120px] text-xs">
-                              <SelectValue placeholder="Сонгох" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Сонгохгүй</SelectItem>
-                              {bloomOptions.map(bloom => (
-                                <SelectItem key={bloom} value={bloom}>{bloom}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          selectedTest.bloom || '-'
-                        )}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="pr-2 py-1 font-semibold">Эх сурвалж:</td>
-                      <td className="py-1">
-                        {isEditing ? (
-                          <Input
-                            type="text"
-                            value={editingTest?.source || ''}
-                            onChange={(e) => setEditingTest(prev => prev ? { ...prev, source: e.target.value } : null)}
-                            className="h-8 text-sm"
-                          />
-                        ) : (
-                          selectedTest.source || '-'
+                          selectedProblem.difficulty || '-'
                         )}
                       </td>
                       <td className="pr-2 py-1 font-semibold">Оноо:</td>
@@ -929,60 +912,61 @@ export default function ModeratorTestsViewPage() {
                         {isEditing ? (
                           <Input
                             type="number"
-                            value={editingTest?.score || 0}
-                            onChange={(e) => setEditingTest(prev => prev ? { ...prev, score: Number(e.target.value) } : null)}
+                            value={editingProblem?.score || 0}
+                            onChange={(e) => setEditingProblem(prev => prev ? { ...prev, score: Number(e.target.value) } : null)}
                             className="h-8 text-sm"
                           />
                         ) : (
-                          selectedTest.score || '-'
+                          selectedProblem.score || '-'
                         )}
                       </td>
-                      <td className="pr-2 py-1 font-semibold">Хугацаа:</td>
-                      <td className="py-1">
+                    </tr>
+                    <tr>
+                      <td className="pr-2 py-1 font-semibold">Эх сурвалж:</td>
+                      <td className="py-1" colSpan={3}>
                         {isEditing ? (
                           <Input
-                            type="number"
-                            value={editingTest?.timeLimit || 0}
-                            onChange={(e) => setEditingTest(prev => prev ? { ...prev, timeLimit: Number(e.target.value) } : null)}
+                            type="text"
+                            value={editingProblem?.references || ''}
+                            onChange={(e) => setEditingProblem(prev => prev ? { ...prev, references: e.target.value } : null)}
                             className="h-8 text-sm"
                           />
                         ) : (
-                          selectedTest.timeLimit !== undefined ? `${selectedTest.timeLimit} сек` : '-'
+                          selectedProblem.references || '-'
                         )}
                       </td>
                     </tr>
                     <tr>
                       <td className="pr-2 py-1 font-semibold">Үүсгэсэн огноо:</td>
-                      <td className="py-1" colSpan={5}>
-                        {selectedTest.createdAt && selectedTest.createdAt instanceof Date ? selectedTest.createdAt.toLocaleDateString() + ' ' + selectedTest.createdAt.toLocaleTimeString() : '-'}
+                      <td className="py-1" colSpan={3}>
+                        {selectedProblem.createdAt && selectedProblem.createdAt instanceof Date ? selectedProblem.createdAt.toLocaleDateString() + ' ' + selectedProblem.createdAt.toLocaleTimeString() : '-'}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <p><b>Асуултын дугаар:</b> {selectedTest.questionNumber}</p>
-              <p><b>Модератор:</b> {selectedTest.moderatorName}</p>
-              <p><b>Асуулт:</b></p>
+              <p><b>Модератор:</b> {selectedProblem.moderatorName}</p>
+              <p><b>Бодлого:</b></p>
               {isEditing ? (
                   <Textarea
-                    value={editingTest?.questionText || ''}
-                    onChange={(e) => setEditingTest(prev => prev ? { ...prev, questionText: e.target.value } : null)}
+                    value={editingProblem?.problemText || ''}
+                    onChange={(e) => setEditingProblem(prev => prev ? { ...prev, problemText: e.target.value } : null)}
                     rows={4}
                     className="text-sm"
                   />
               ) : (
-                  <LatexRenderer text={selectedTest.questionText} />
+                  <LatexRenderer text={selectedProblem.problemText} />
               )}
 
-              {selectedTest.questionImage && (
+              {selectedProblem.problemImage && (
                 <div className="mb-4">
-                  <h3 className="mb-2 font-semibold text-gray-700">Асуултын зураг:</h3>
+                  <h3 className="mb-2 font-semibold text-gray-700">Бодлогын зураг:</h3>
                   <div className="relative flex h-64 w-full items-center justify-center overflow-hidden rounded-md bg-gray-100">
-                  {getR2PublicImageUrl(selectedTest.questionImage) ? (
+                  {getR2PublicImageUrl(selectedProblem.problemImage) ? (
                         <Image
-                          src={getR2PublicImageUrl(selectedTest.questionImage)!}
-                          alt={`Тестийн зураг: ${selectedTest.questionNumber}`}
+                          src={getR2PublicImageUrl(selectedProblem.problemImage)!}
+                          alt={`Бодлогын зураг: ${selectedProblem.title}`}
                           fill
                           style={{ objectFit: 'contain' }}
                           className="rounded-md"
@@ -1007,96 +991,57 @@ export default function ModeratorTestsViewPage() {
                 </div>
               )}
 
-              {selectedTest.options && selectedTest.options.length > 0 && (
-                <div className="space-y-2">
-                  <p className="font-semibold">Хариултын сонголтууд:</p>
-                  {selectedTest.options.map((option, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                        option === selectedTest.correctAnswer ? 'border-green-600 bg-green-500 text-white' : 'border-gray-300 bg-gray-200 text-gray-700'
-                      }`}>
-                        {String.fromCharCode(65 + idx)}
-                      </span>
-                      {isEditing ? (
-                        <Textarea
-                          value={editingTest?.options?.[idx] || ''}
-                          onChange={(e) => {
-                            const newOptions = [...(editingTest?.options || [])];
-                            newOptions[idx] = e.target.value;
-                            setEditingTest(prev => prev ? { ...prev, options: newOptions } : null);
-                          }}
-                          rows={1}
-                          className="flex-grow text-sm"
-                        />
-                      ) : (
-                        <LatexRenderer text={option} />
-                      )}
+              <p className="font-semibold text-green-600">Зөв хариулт:</p>
+              {isEditing ? (
+                  <Textarea
+                    value={editingProblem?.correctAnswerInput || ''}
+                    onChange={(e) => setEditingProblem(prev => prev ? { ...prev, correctAnswerInput: e.target.value } : null)}
+                    rows={2}
+                    className="text-sm"
+                  />
+              ) : (
+                  <LatexRenderer text={selectedProblem.correctAnswerInput || '-'} />
+              )}
 
-                      {(() => {
-                          const rawPath = selectedTest.optionImages?.[idx];
-                          const imageUrl = rawPath && rawPath !== 'null' ? getR2PublicImageUrl(rawPath) : null;
-                          return imageUrl ? (
-                            <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md bg-gray-100 shadow-sm">
-                              <Image
-                                src={imageUrl}
-                                alt={`Сонголтын зураг ${idx + 1}`}
-                                fill
-                                style={{ objectFit: 'contain' }}
-                                className="rounded-md"
-                                sizes="80px"
-                                placeholder="empty"
-                              />
-                            </div>
-                          ) : (
-                            isEditing && <Button variant="outline" size="icon" className="h-6 w-6 text-xs"><Edit className="h-3 w-3" /></Button>
-                          );
-                      })()}
-                      {isEditing && (!selectedTest.optionImages || !selectedTest.optionImages[idx]) && (
-                        <Button variant="outline" size="icon" className="h-6 w-6 text-xs"><Edit className="h-3 w-3" /></Button>
-                      )}
-                    </div>
-                  ))}
-                  {isEditing && (
-                    <Button variant="outline" size="sm" className="mt-2 h-8 text-xs">Сонголт нэмэх/хасах (Функц нэмэх)</Button>
+              {selectedProblem.answerHint && (
+                <div>
+                  <p><b>Хариултын заавар / зөвлөгөө:</b></p>
+                  {isEditing ? (
+                      <Textarea
+                        value={editingProblem?.answerHint || ''}
+                        onChange={(e) => setEditingProblem(prev => prev ? { ...prev, answerHint: e.target.value } : null)}
+                        rows={2}
+                        className="text-sm"
+                      />
+                  ) : (
+                      <LatexRenderer text={selectedProblem.answerHint} />
                   )}
                 </div>
               )}
-              <p className="font-semibold text-green-600">Зөв хариулт:
-                {isEditing ? (
-                  <Input
-                    type="text"
-                    value={editingTest?.correctAnswer || ''}
-                    onChange={(e) => setEditingTest(prev => prev ? { ...prev, correctAnswer: e.target.value } : null)}
-                    className="ml-2 inline-block h-8 w-48 text-sm"
-                  />
-                ) : (
-                  <LatexRenderer text={selectedTest.correctAnswer || '-'} />
-                )}
-              </p>
 
-              {selectedTest.explanation && (
+              {selectedProblem.solutionText && (
                 <div>
                   <p><b>Бодолт:</b></p>
                   {isEditing ? (
                       <Textarea
-                        value={editingTest?.explanation || ''}
-                        onChange={(e) => setEditingTest(prev => prev ? { ...prev, explanation: e.target.value } : null)}
+                        value={editingProblem?.solutionText || ''}
+                        onChange={(e) => setEditingProblem(prev => prev ? { ...prev, solutionText: e.target.value } : null)}
                         rows={4}
                         className="text-sm"
                       />
                   ) : (
-                      <LatexRenderer text={selectedTest.explanation} />
+                      <LatexRenderer text={selectedProblem.solutionText} />
                   )}
                 </div>
               )}
-              {selectedTest.explanationImage && (
+              {selectedProblem.solutionImage && (
                 <div className="mb-4">
                   <h3 className="mb-2 font-semibold text-gray-700">Бодолтын зураг:</h3>
                   <div className="relative flex h-64 w-full items-center justify-center overflow-hidden rounded-md bg-gray-100">
-                  {getR2PublicImageUrl(selectedTest.explanationImage) ? (
+                  {getR2PublicImageUrl(selectedProblem.solutionImage) ? (
                     <Image
-                      src={getR2PublicImageUrl(selectedTest.explanationImage)!}
-                      alt={`Бодолтын зураг: ${selectedTest.questionNumber}`}
+                      src={getR2PublicImageUrl(selectedProblem.solutionImage)!}
+                      alt={`Бодолтын зураг: ${selectedProblem.title}`}
                       fill
                       style={{ objectFit: 'contain' }}
                       className="rounded-md"
@@ -1117,6 +1062,21 @@ export default function ModeratorTestsViewPage() {
                   </div>
                   {isEditing && (
                     <Button variant="outline" size="sm" className="mt-2 h-8 text-xs">Зураг солих / Устгах (Функц нэмэх)</Button>
+                  )}
+                </div>
+              )}
+              {selectedProblem.tags && selectedProblem.tags.length > 0 && (
+                <div>
+                  <p><b>Түлхүүр үгс:</b></p>
+                  {isEditing ? (
+                    <Textarea
+                      value={editingProblem?.tags?.join(', ') || ''}
+                      onChange={(e) => setEditingProblem(prev => prev ? { ...prev, tags: e.target.value.split(',').map(tag => tag.trim()) } : null)}
+                      rows={1}
+                      className="text-sm"
+                    />
+                  ) : (
+                    <p className="text-gray-700">{selectedProblem.tags.join(', ')}</p>
                   )}
                 </div>
               )}
