@@ -278,25 +278,40 @@ export default function ViewLessonsPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  // Modified handleDeleteLesson to be called from the AlertDialogAction
+  // --- ЭНЭ ХЭСГИЙГ ЗАСВАРЛАСАН: handleDeleteLesson ---
   const handleDeleteLesson = async () => {
-    if (!lessonToDeleteId) return; // Ensure an ID is set
+    if (!lessonToDeleteId) return; // ID байгаа эсэхийг шалгах
 
     try {
       setLoadingLessons(true);
-      await deleteDoc(doc(db, 'lessons', lessonToDeleteId));
+      
+      const lessonRef = doc(db, 'lessons', lessonToDeleteId);
+      
+      await deleteDoc(lessonRef);
+      
       toast.success("Хичээл амжилттай устгагдлаа.");
-      fetchLessonsIndependent('initial', null, true); // Refresh list
+      
+      // Жагсаалтыг шинэчлэх
+      fetchLessonsIndependent('initial', null, true); 
+      
     } catch (error) {
-      console.error("Хичээл устгахад алдаа гарлаа:", error);
-      toast.error("Хичээл устгахад алдаа гарлаа.", { description: error instanceof Error ? error.message : String(error) });
+      // Алдааны кодыг шалгаж, тохирох мессеж харуулах
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'permission-denied') {
+        // Зөвшөөрлийн алдааг консол дээр харуулахгүй, зөвхөн хэрэглэгчид тост мессеж харуулна.
+        toast.error("Зөвхөн өөрийн үүсгэсэн хичээлийг устгах боломжтой.");
+      } else {
+        // Бусад төрлийн алдааг консол дээр харуулж, ерөнхий тост мессеж өгнө.
+        console.error("Хичээл устгахад алдаа гарлаа:", error);
+        toast.error("Хичээл устгахад алдаа гарлаа.", { description: error instanceof Error ? error.message : String(error) });
+      }
       setError("Хичээл устгахад алдаа гарлаа.");
     } finally {
       setLoadingLessons(false);
-      setIsDeleteDialogOpen(false); // Close dialog
-      setLessonToDeleteId(null); // Clear the ID
+      setIsDeleteDialogOpen(false); // Диалогийг хаах
+      setLessonToDeleteId(null); // ID-г цэвэрлэх
     }
   };
+
 
   const handleEditLesson = (lessonId: string) => {
     router.push(`/moderator/lessons/edit/${lessonId}`);

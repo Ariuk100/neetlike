@@ -1,4 +1,3 @@
-// moderator/tests/create/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,30 +11,30 @@ import { Button } from '@/components/ui/button';
 import LatexRenderer from '@/components/LatexRenderer';
 import { uploadFileToR2 } from '@/lib/uploadFileToR2';
 import { db } from '@/lib/firebase';
-// Доорх импортуудыг нэмнэ
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, increment } from 'firebase/firestore'; // FieldValue болон increment нэмсэн
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, increment } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useAuth } from '@/app/context/AuthContext';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCacheContext } from '@/lib/CacheContext';
 
-// ... (бусад type definitions болон interface-үүд өөрчлөгдөөгүй)
+// Өөрчлөгдсөн TYPEs
 type AnswerType = 'choice-single' | 'choice-multiple' | 'input' | 'problem' | 'experiment' | 'truefalse';
 type BloomLevel = 'СЭРГЭЭН САНАХ' | 'ОЙЛГОХ' | 'ХЭРЭГЛЭХ' | 'ЗАДЛАН ШИНЖЛЭХ' | 'ҮНЭЛЭХ' | 'БҮТЭЭХ' | '';
 type DifficultyLevel = 'Амархан' | 'Дунд' | 'Хүнд' | '';
 type SourceType = 'IGCSE' | 'IB' | 'NEET' | 'JEE' | 'AS LEVEL' | 'A LEVEL' | 'RUSSIA' | 'AP' | 'SAT' | 'MONGOL' | '';
+type SubjectType = 'Математик' | 'Хими' | 'Биологи' | 'Физик';
 
 interface Chapter {
   id: string;
   name: string;
-  quizCount?: number; // quizCount талбарыг нэмсэн
+  quizCount?: number;
 }
 
 interface Subchapter {
   id: string;
   name: string;
   chapterId: string;
-  quizCount?: number; // quizCount талбарыг нэмсэн
+  quizCount?: number;
 }
 
 interface FormData {
@@ -51,7 +50,7 @@ interface FormData {
   imageFiles: (File | null)[];
   explanation: string;
   explanationImage: File | null;
-  subject: string;
+  subject: SubjectType;
   topic: string;
   subtopic: string;
   bloom: BloomLevel;
@@ -98,7 +97,7 @@ export default function TeacherTestPage() {
       imageFiles: [null, null, null, null, null, null],
       explanation: '',
       explanationImage: null,
-      subject: 'Физик',
+      subject: 'Физик', // Анхны утгыг "Физик" болгосон
       topic: '',
       subtopic: '',
       bloom: '',
@@ -204,10 +203,9 @@ export default function TeacherTestPage() {
   useEffect(() => {
     handleInputChange('subtopic', '');
     if (!form.topic) {
-        setSubchapters([]);
+      setSubchapters([]);
     }
   }, [form.topic, handleInputChange]);
-
 
   const handleFileChange = useCallback((key: 'questionImageFile' | 'explanationImage', file: File | null) => {
     setForm((prev) => ({ ...prev, [key]: file }));
@@ -224,8 +222,6 @@ export default function TeacherTestPage() {
     newImageFiles[index] = file;
     handleInputChange('imageFiles', newImageFiles);
   }, [form.imageFiles, handleInputChange]);
-
-  
 
   const handleSave = async () => {
     if (!user || !user.uid) {
@@ -251,6 +247,10 @@ export default function TeacherTestPage() {
         correctAnswerToSend = form.correctAnswerText;
       }
 
+      // Бүлэг болон дэд бүлгийн ID-г хадгалах
+      const selectedChapter = chapters.find(chapter => chapter.name === form.topic);
+      const selectedSubchapter = subchapters.find(sub => sub.name === form.subtopic);
+
       const questionData = {
         questionNumber: parseInt(form.questionNumber) || 0,
         question: form.question,
@@ -262,8 +262,8 @@ export default function TeacherTestPage() {
         explanation: form.explanation,
         explanationImage: explanationImageUrl,
         subject: form.subject,
-        topic: form.topic,
-        subtopic: form.subtopic,
+        chapterId: selectedChapter?.id || null, // ID-г хадгалах
+        subchapterId: selectedSubchapter?.id || null, // ID-г хадгалах
         bloom: form.bloom,
         difficulty: form.difficulty,
         score: form.score,
@@ -278,8 +278,6 @@ export default function TeacherTestPage() {
 
       // Chapters болон Subchapters-ийн quizCount-ийг нэмэгдүүлэх хэсэг
       try {
-        // Бүлгийн quizCount-ийг нэмэгдүүлэх
-        const selectedChapter = chapters.find(chapter => chapter.name === form.topic);
         if (selectedChapter) {
           const chapterRef = doc(db, 'chapters', selectedChapter.id);
           await updateDoc(chapterRef, {
@@ -290,8 +288,6 @@ export default function TeacherTestPage() {
           console.warn(`Бүлэг "${form.topic}" олдсонгүй, quizCount нэмэгдүүлээгүй.`);
         }
 
-        // Дэд бүлгийн quizCount-ийг нэмэгдүүлэх
-        const selectedSubchapter = subchapters.find(sub => sub.name === form.subtopic);
         if (selectedSubchapter) {
           const subchapterRef = doc(db, 'subchapters', selectedSubchapter.id);
           await updateDoc(subchapterRef, {
@@ -344,8 +340,7 @@ export default function TeacherTestPage() {
         <Card>
           <CardHeader><CardTitle>Тест оруулах</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            {/* Шинэчилсэн оролтын талбаруудын зохион байгуулалт */}
-            <div className="grid grid-cols-4 gap-2"> {/* Эхний мөрийг 4 баганатай болгосон */}
+            <div className="grid grid-cols-4 gap-2">
               <div>
                 <Label htmlFor="questionNumber">Асуултын №</Label>
                 <Input id="questionNumber" value={form.questionNumber} onChange={(e) => handleInputChange('questionNumber', e.target.value)} />
@@ -353,7 +348,7 @@ export default function TeacherTestPage() {
               <div>
                 <Label htmlFor="answerType">Төрөл</Label>
                 <Select value={form.answerType} onValueChange={(v: AnswerType) => handleInputChange('answerType', v)}>
-                  <SelectTrigger id="answerType" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="answerType" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                     <SelectValue placeholder="Тестийн төрөл" />
                   </SelectTrigger>
                   <SelectContent>
@@ -368,7 +363,17 @@ export default function TeacherTestPage() {
               </div>
               <div>
                 <Label htmlFor="subject">Хичээл</Label>
-                <Input id="subject" value={form.subject} onChange={(e) => handleInputChange('subject', e.target.value)} />
+                <Select value={form.subject} onValueChange={(v: SubjectType) => handleInputChange('subject', v)}>
+                  <SelectTrigger id="subject" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
+                    <SelectValue placeholder="Хичээл сонгоно уу" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Математик">Математик</SelectItem>
+                    <SelectItem value="Хими">Хими</SelectItem>
+                    <SelectItem value="Биологи">Биологи</SelectItem>
+                    <SelectItem value="Физик">Физик</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="score">Оноо</Label>
@@ -376,7 +381,7 @@ export default function TeacherTestPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2"> {/* Хоёр дахь мөрийг 2 баганатай болгосон */}
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label htmlFor="topic">Сэдэв (Бүлэг)</Label>
                 <Select
@@ -384,7 +389,7 @@ export default function TeacherTestPage() {
                   onValueChange={(v) => handleInputChange('topic', v)}
                   disabled={loadingChapters}
                 >
-                  <SelectTrigger id="topic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="topic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                   <SelectValue placeholder={!form.topic && loadingChapters ? "Ачаалж байна..." : "Бүлэг сонгоно уу"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -403,19 +408,15 @@ export default function TeacherTestPage() {
                   onValueChange={(v) => handleInputChange('subtopic', v)}
                   disabled={loadingSubchapters || !form.topic}
                 >
-                  <SelectTrigger id="subtopic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="subtopic" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                   <SelectValue
   placeholder={
-    // Хэрэв топик сонгогдсон бөгөөд дэд бүлгүүд ачаалж байгаа бол "Дэд бүлэг ачаалж байна..." харуулна.
     form.topic && loadingSubchapters
       ? "Дэд бүлэг ачаалж байна..."
-      // Хэрэв топик сонгогдоогүй бол "Эхлээд бүлэг сонгоно уу" харуулна.
       : !form.topic
         ? "Эхлээд бүлэг сонгоно уу"
-        // Хэрэв топик сонгогдсон, ачаалагдаагүй, дэд бүлэг байхгүй бол "Дэд бүлэг байхгүй" харуулна.
         : form.topic && !loadingSubchapters && subchapters.length === 0
           ? "Дэд бүлэг байхгүй"
-          // Бусад тохиолдолд, өгөгдмөл "Дэд бүлэг сонгоно уу" харуулна.
           : "Дэд бүлэг сонгоно уу"
   }
 />
@@ -431,11 +432,11 @@ export default function TeacherTestPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-2"> {/* Гурав дахь мөрийг 4 баганатай болгосон */}
+            <div className="grid grid-cols-4 gap-2">
               <div>
                 <Label htmlFor="bloom">Bloom&apos;s</Label>
                 <Select value={form.bloom} onValueChange={(v: BloomLevel) => handleInputChange('bloom', v)}>
-                  <SelectTrigger id="bloom" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="bloom" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                     <SelectValue placeholder="Bloom&apos;s" />
                   </SelectTrigger>
                   <SelectContent>
@@ -451,7 +452,7 @@ export default function TeacherTestPage() {
               <div>
                 <Label htmlFor="difficulty">Хүндрэл</Label>
                 <Select value={form.difficulty} onValueChange={(v: DifficultyLevel) => handleInputChange('difficulty', v)}>
-                  <SelectTrigger id="difficulty" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="difficulty" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                     <SelectValue placeholder="Хүндрэл" />
                   </SelectTrigger>
                   <SelectContent>
@@ -468,7 +469,7 @@ export default function TeacherTestPage() {
               <div>
                 <Label htmlFor="source">Source</Label>
                 <Select value={form.source} onValueChange={(v: SourceType) => handleInputChange('source', v)}>
-                  <SelectTrigger id="source" className="w-full overflow-hidden whitespace-nowrap text-ellipsis"> {/* Урт нэрийг хязгаарлах */}
+                  <SelectTrigger id="source" className="w-full overflow-hidden whitespace-nowrap text-ellipsis">
                     <SelectValue placeholder="Эх сурвалж" />
                   </SelectTrigger>
                   <SelectContent>
@@ -607,7 +608,6 @@ export default function TeacherTestPage() {
         </Card>
       </div>
 
-      {/* Preview хэсэг - ЭНЭ ХЭСГИЙГ ӨӨРЧЛӨГДӨХГҮЙ ОРХИЛОО */}
       <div>
         <Card>
           <CardHeader><CardTitle>Preview</CardTitle></CardHeader>

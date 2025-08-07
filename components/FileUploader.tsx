@@ -10,7 +10,7 @@ import Image from 'next/image';
 interface FileUploaderProps {
   label: string;
   fileUrl?: string;
-  onUploadSuccess: (url: string, fileType: 'image' | 'audio' | 'video') => void; // Шинэчлэгдсэн: fileType-ийг нэмсэн
+  onUploadSuccess: (url: string, file: File) => void; // fileType-ийг file болгож өөрчилсөн
   onClear: () => void;
   accept: string;
 }
@@ -35,11 +35,11 @@ export default function FileUploader({ label, fileUrl, onUploadSuccess, onClear,
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const dummyUrl = URL.createObjectURL(file);
-    onUploadSuccess(dummyUrl, fileType as 'image' | 'audio' | 'video');
+    onUploadSuccess(dummyUrl, file); // fileType-ийг file болгож өөрчилсөн
 
     setIsUploading(false);
     e.target.value = '';
-  }, [onUploadSuccess, fileType]);
+  }, [onUploadSuccess]);
 
   const renderPreview = () => {
     if (!fileUrl) return null;
