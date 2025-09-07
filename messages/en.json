@@ -1,0 +1,272 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error occurred",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "clear": "Clear",
+    "refresh": "Refresh",
+    "download": "Download",
+    "upload": "Upload",
+    "export": "Export",
+    "import": "Import",
+    "print": "Print",
+    "share": "Share",
+    "copy": "Copy",
+    "paste": "Paste",
+    "select_all": "Select All",
+    "deselect_all": "Deselect All",
+    "show_more": "Show More",
+    "show_less": "Show Less",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "navigation": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "tests": "Tests",
+    "questions": "Questions",
+    "results": "Results",
+    "profile": "Profile",
+    "settings": "Settings",
+    "help": "Help",
+    "about": "About",
+    "contact": "Contact",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register"
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "subtitle": "Welcome to PhysX Dashboard",
+      "email": "Email address",
+      "password": "Password",
+      "remember_me": "Remember me",
+      "forgot_password": "Forgot password?",
+      "login_button": "Login",
+      "no_account": "Don't have an account?",
+      "create_account": "Create new account",
+      "login_with_google": "Login with Google"
+    },
+    "register": {
+      "title": "Register",
+      "subtitle": "Create a new account",
+      "full_name": "Full name",
+      "email": "Email address",
+      "password": "Password",
+      "confirm_password": "Confirm password",
+      "phone": "Phone number",
+      "school": "School",
+      "grade": "Grade",
+      "register_button": "Register",
+      "have_account": "Already have an account?",
+      "login_here": "Login here",
+      "terms_and_conditions": "Terms and Conditions",
+      "privacy_policy": "Privacy Policy",
+      "agree_to_terms": "I agree to the Terms and Conditions"
+    },
+    "validation": {
+      "required": "This field is required",
+      "email_invalid": "Invalid email format",
+      "password_min_length": "Password must be at least 6 characters",
+      "passwords_dont_match": "Passwords don't match",
+      "phone_invalid": "Invalid phone number format"
+    },
+    "errors": {
+      "invalid_credentials": "Invalid email or password",
+      "user_not_found": "User not found",
+      "email_already_exists": "This email is already registered",
+      "weak_password": "Password is too weak",
+      "network_error": "Network error occurred",
+      "unknown_error": "Unknown error occurred"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome, {name}!",
+    "stats": {
+      "total_tests": "Total Tests",
+      "completed_tests": "Completed Tests",
+      "average_score": "Average Score",
+      "study_time": "Study Time",
+      "achievements": "Achievements",
+      "rank": "Rank"
+    },
+    "recent_activity": "Recent Activity",
+    "quick_actions": "Quick Actions",
+    "start_new_test": "Start New Test",
+    "view_results": "View Results",
+    "study_materials": "Study Materials",
+    "progress_chart": "Progress Chart"
+  },
+  "tests": {
+    "title": "Tests",
+    "create_test": "Create New Test",
+    "test_name": "Test Name",
+    "test_description": "Test Description",
+    "subject": "Subject",
+    "difficulty": "Difficulty",
+    "time_limit": "Time Limit",
+    "question_count": "Question Count",
+    "start_test": "Start Test",
+    "submit_test": "Submit Test",
+    "test_completed": "Test Completed",
+    "your_score": "Your Score",
+    "correct_answers": "Correct Answers",
+    "wrong_answers": "Wrong Answers",
+    "time_spent": "Time Spent",
+    "test_history": "Test History",
+    "retry_test": "Retry Test"
+  },
+  "questions": {
+    "title": "Questions",
+    "create_question": "Create New Question",
+    "question_text": "Question Text",
+    "question_type": "Question Type",
+    "multiple_choice": "Multiple Choice",
+    "true_false": "True/False",
+    "short_answer": "Short Answer",
+    "essay": "Essay",
+    "options": "Options",
+    "correct_answer": "Correct Answer",
+    "explanation": "Explanation",
+    "difficulty_easy": "Easy",
+    "difficulty_medium": "Medium",
+    "difficulty_hard": "Hard",
+    "points": "Points"
+  },
+  "profile": {
+    "title": "Profile",
+    "personal_info": "Personal Information",
+    "academic_info": "Academic Information",
+    "account_settings": "Account Settings",
+    "full_name": "Full Name",
+    "email": "Email",
+    "phone": "Phone",
+    "birth_date": "Birth Date",
+    "gender": "Gender",
+    "address": "Address",
+    "school": "School",
+    "grade": "Grade",
+    "major": "Major",
+    "student_id": "Student ID",
+    "change_password": "Change Password",
+    "current_password": "Current Password",
+    "new_password": "New Password",
+    "confirm_new_password": "Confirm New Password"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "security": "Security",
+    "language": "Language",
+    "theme": "Theme",
+    "light_mode": "Light Mode",
+    "dark_mode": "Dark Mode",
+    "auto_mode": "Auto Mode",
+    "email_notifications": "Email Notifications",
+    "push_notifications": "Push Notifications",
+    "sms_notifications": "SMS Notifications",
+    "test_reminders": "Test Reminders",
+    "result_notifications": "Result Notifications",
+    "marketing_emails": "Marketing Emails",
+    "data_sharing": "Data Sharing",
+    "analytics": "Analytics",
+    "backup_data": "Backup Data",
+    "delete_account": "Delete Account"
+  },
+  "errors": {
+    "page_not_found": "Page Not Found",
+    "access_denied": "Access Denied",
+    "server_error": "Server Error",
+    "network_error": "Network Error",
+    "session_expired": "Session Expired",
+    "invalid_data": "Invalid Data",
+    "file_too_large": "File Too Large",
+    "unsupported_format": "Unsupported Format",
+    "upload_failed": "Upload Failed",
+    "connection_lost": "Connection Lost"
+  },
+  "pwa": {
+    "install_prompt": {
+      "title": "Install App",
+      "description": "Install PhysX Dashboard on your device for faster and easier access!",
+      "install_button": "Install",
+      "cancel_button": "Later",
+      "features": {
+        "offline": "Work offline",
+        "fast_loading": "Fast loading",
+        "notifications": "Get notifications",
+        "desktop": "Desktop experience"
+      }
+    },
+    "offline": {
+      "title": "Internet Connection Lost",
+      "description": "Sorry, internet connection is lost. Please check your connection and try again to use PhysX Dashboard.",
+      "retry_button": "Try Again",
+      "home_button": "Back to Home",
+      "features_title": "Offline Mode Features:",
+      "features": {
+        "sync": "Your saved test answers will be automatically synced",
+        "local_data": "Profile information is stored locally",
+        "auto_update": "All data will be automatically updated when connection is restored",
+        "limited_features": "Some online features are limited"
+      }
+    }
+  },
+  "monitoring": {
+    "title": "Performance Monitoring",
+    "description": "Real-time application performance and error tracking",
+    "metrics": {
+      "response_time": "Response Time",
+      "error_rate": "Error Rate",
+      "memory_usage": "Memory Usage",
+      "active_users": "Active Users"
+    },
+    "web_vitals": "Core Web Vitals",
+    "system_health": "System Health",
+    "user_activity": "User Activity",
+    "test_buttons": {
+      "test_performance": "Test Performance",
+      "test_error": "Test Error Reporting"
+    }
+  },
+  "cache": {
+    "title": "Cache Management",
+    "description": "Monitor and manage React Query and browser cache",
+    "metrics": {
+      "active_queries": "Active Queries",
+      "cache_size": "Cache Size",
+      "local_storage": "Local Storage",
+      "active_mutations": "Active Mutations"
+    },
+    "tabs": {
+      "query_cache": "Query Cache",
+      "browser_storage": "Browser Storage",
+      "cache_settings": "Cache Settings"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "clear_all": "Clear All",
+      "invalidate": "Invalidate",
+      "remove": "Remove"
+    }
+  }
+}

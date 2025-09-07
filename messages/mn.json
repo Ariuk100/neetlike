@@ -1,0 +1,272 @@
+{
+  "common": {
+    "loading": "Ачаалж байна...",
+    "error": "Алдаа гарлаа",
+    "success": "Амжилттай",
+    "save": "Хадгалах",
+    "cancel": "Цуцлах",
+    "delete": "Устгах",
+    "edit": "Засах",
+    "create": "Үүсгэх",
+    "update": "Шинэчлэх",
+    "confirm": "Баталгаажуулах",
+    "back": "Буцах",
+    "next": "Дараах",
+    "previous": "Өмнөх",
+    "close": "Хаах",
+    "search": "Хайх",
+    "filter": "Шүүлтүүр",
+    "clear": "Цэвэрлэх",
+    "refresh": "Шинэчлэх",
+    "download": "Татаж авах",
+    "upload": "Байршуулах",
+    "export": "Экспорт хийх",
+    "import": "Импорт хийх",
+    "print": "Хэвлэх",
+    "share": "Хуваалцах",
+    "copy": "Хуулах",
+    "paste": "Буулгах",
+    "select_all": "Бүгдийг сонгох",
+    "deselect_all": "Сонголтыг болих",
+    "show_more": "Дэлгэрэнгүй харах",
+    "show_less": "Хураангуй харах",
+    "expand": "Дэлгэх",
+    "collapse": "Хаах",
+    "yes": "Тийм",
+    "no": "Үгүй"
+  },
+  "navigation": {
+    "home": "Нүүр",
+    "dashboard": "Хянах самбар",
+    "tests": "Тестүүд",
+    "questions": "Асуултууд",
+    "results": "Үр дүнгүүд",
+    "profile": "Профайл",
+    "settings": "Тохиргоо",
+    "help": "Тусламж",
+    "about": "Тухай",
+    "contact": "Холбоо барих",
+    "logout": "Гарах",
+    "login": "Нэвтрэх",
+    "register": "Бүртгүүлэх"
+  },
+  "auth": {
+    "login": {
+      "title": "Нэвтрэх",
+      "subtitle": "PhysX Dashboard-д тавтай морилно уу",
+      "email": "И-мэйл хаяг",
+      "password": "Нууц үг",
+      "remember_me": "Намайг санах",
+      "forgot_password": "Нууц үгээ мартсан уу?",
+      "login_button": "Нэвтрэх",
+      "no_account": "Бүртгэл байхгүй юу?",
+      "create_account": "Шинэ бүртгэл үүсгэх",
+      "login_with_google": "Google-ээр нэвтрэх"
+    },
+    "register": {
+      "title": "Бүртгүүлэх",
+      "subtitle": "Шинэ бүртгэл үүсгэх",
+      "full_name": "Овог нэр",
+      "email": "И-мэйл хаяг",
+      "password": "Нууц үг",
+      "confirm_password": "Нууц үг баталгаажуулах",
+      "phone": "Утасны дугаар",
+      "school": "Сургууль",
+      "grade": "Анги",
+      "register_button": "Бүртгүүлэх",
+      "have_account": "Аль хэдийн бүртгэлтэй юу?",
+      "login_here": "Энд нэвтрэх",
+      "terms_and_conditions": "Үйлчилгээний нөхцөл",
+      "privacy_policy": "Нууцлалын бодлого",
+      "agree_to_terms": "Үйлчилгээний нөхцлийг зөвшөөрч байна"
+    },
+    "validation": {
+      "required": "Энэ талбар заавал бөглөнө үү",
+      "email_invalid": "И-мэйл хаягийн формат буруу байна",
+      "password_min_length": "Нууц үг хамгийн багадаа 6 тэмдэгт байх ёстой",
+      "passwords_dont_match": "Нууц үг таарахгүй байна",
+      "phone_invalid": "Утасны дугаарын формат буруу байна"
+    },
+    "errors": {
+      "invalid_credentials": "И-мэйл эсвэл нууц үг буруу байна",
+      "user_not_found": "Хэрэглэгч олдсонгүй",
+      "email_already_exists": "Энэ и-мэйл хаяг аль хэдийн бүртгэлтэй байна",
+      "weak_password": "Нууц үг хангалтгүй хүчтэй байна",
+      "network_error": "Сүлжээний алдаа гарлаа",
+      "unknown_error": "Тодорхойгүй алдаа гарлаа"
+    }
+  },
+  "dashboard": {
+    "title": "Хянах самбар",
+    "welcome": "Тавтай морилно уу, {name}!",
+    "stats": {
+      "total_tests": "Нийт тест",
+      "completed_tests": "Хийсэн тест",
+      "average_score": "Дундаж оноо",
+      "study_time": "Сурсан цаг",
+      "achievements": "Амжилтууд",
+      "rank": "Эрэмбэ"
+    },
+    "recent_activity": "Сүүлийн үйл ажиллагаа",
+    "quick_actions": "Хурдан үйлдлүүд",
+    "start_new_test": "Шинэ тест эхлэх",
+    "view_results": "Үр дүн харах",
+    "study_materials": "Сурах материал",
+    "progress_chart": "Ахиц дэвшлийн график"
+  },
+  "tests": {
+    "title": "Тестүүд",
+    "create_test": "Шинэ тест үүсгэх",
+    "test_name": "Тестийн нэр",
+    "test_description": "Тестийн тайлбар",
+    "subject": "Хичээл",
+    "difficulty": "Түвшин",
+    "time_limit": "Хугацааны хязгаар",
+    "question_count": "Асуултын тоо",
+    "start_test": "Тест эхлэх",
+    "submit_test": "Тест өгөх",
+    "test_completed": "Тест дууссан",
+    "your_score": "Таны оноо",
+    "correct_answers": "Зөв хариулт",
+    "wrong_answers": "Буруу хариулт",
+    "time_spent": "Зарцуулсан цаг",
+    "test_history": "Тестийн түүх",
+    "retry_test": "Дахин оролдох"
+  },
+  "questions": {
+    "title": "Асуултууд",
+    "create_question": "Шинэ асуулт үүсгэх",
+    "question_text": "Асуултын текст",
+    "question_type": "Асуултын төрөл",
+    "multiple_choice": "Олон сонголттой",
+    "true_false": "Үнэн/Худал",
+    "short_answer": "Богино хариулт",
+    "essay": "Эссэ",
+    "options": "Сонголтууд",
+    "correct_answer": "Зөв хариулт",
+    "explanation": "Тайлбар",
+    "difficulty_easy": "Хялбар",
+    "difficulty_medium": "Дунд",
+    "difficulty_hard": "Хэцүү",
+    "points": "Оноо"
+  },
+  "profile": {
+    "title": "Профайл",
+    "personal_info": "Хувийн мэдээлэл",
+    "academic_info": "Боловсролын мэдээлэл",
+    "account_settings": "Бүртгэлийн тохиргоо",
+    "full_name": "Овог нэр",
+    "email": "И-мэйл",
+    "phone": "Утас",
+    "birth_date": "Төрсөн өдөр",
+    "gender": "Хүйс",
+    "address": "Хаяг",
+    "school": "Сургууль",
+    "grade": "Анги",
+    "major": "Мэргэжил",
+    "student_id": "Оюутны дугаар",
+    "change_password": "Нууц үг солих",
+    "current_password": "Одоогийн нууц үг",
+    "new_password": "Шинэ нууц үг",
+    "confirm_new_password": "Шинэ нууц үгийг баталгаажуулах"
+  },
+  "settings": {
+    "title": "Тохиргоо",
+    "general": "Ерөнхий",
+    "notifications": "Мэдэгдэл",
+    "privacy": "Нууцлал",
+    "security": "Аюулгүй байдал",
+    "language": "Хэл",
+    "theme": "Загвар",
+    "light_mode": "Цагaan загвар",
+    "dark_mode": "Хар загвар",
+    "auto_mode": "Автомат",
+    "email_notifications": "И-мэйл мэдэгдэл",
+    "push_notifications": "Push мэдэгдэл",
+    "sms_notifications": "SMS мэдэгдэл",
+    "test_reminders": "Тестийн сануулга",
+    "result_notifications": "Үр дүнгийн мэдэгдэл",
+    "marketing_emails": "Маркетингийн и-мэйл",
+    "data_sharing": "Өгөгдөл хуваалцах",
+    "analytics": "Шинжилгээ",
+    "backup_data": "Өгөгдлийн нөөц",
+    "delete_account": "Бүртгэл устгах"
+  },
+  "errors": {
+    "page_not_found": "Хуудас олдсонгүй",
+    "access_denied": "Хандах эрх байхгүй",
+    "server_error": "Серверийн алдаа",
+    "network_error": "Сүлжээний алдаа",
+    "session_expired": "Сессийн хугацаа дууссан",
+    "invalid_data": "Буруу өгөгдөл",
+    "file_too_large": "Файл хэтэрхий том байна",
+    "unsupported_format": "Дэмжигдээгүй формат",
+    "upload_failed": "Байршуулж чадсангүй",
+    "connection_lost": "Холболт тасарсан"
+  },
+  "pwa": {
+    "install_prompt": {
+      "title": "Апп суулгах",
+      "description": "PhysX Dashboard-г таны төхөөрөмжид суулгаад илүү хурдан, хялбар ашиглаарай!",
+      "install_button": "Суулгах",
+      "cancel_button": "Дараа",
+      "features": {
+        "offline": "Офлайн ажиллах",
+        "fast_loading": "Хурдан ачаалах",
+        "notifications": "Мэдэгдэл авах",
+        "desktop": "Desktop дэлгэц"
+      }
+    },
+    "offline": {
+      "title": "Интернэт холболт алдагдлаа",
+      "description": "Уучлаарай, интернэт холболт алдагдсан байна. PhysX Dashboard-г ашиглахын тулд интернэт холболтоо шалгаад дахин оролдоно уу.",
+      "retry_button": "Дахин оролдох",
+      "home_button": "Нүүр хуудас руу буцах",
+      "features_title": "Офлайн горимын онцлогууд:",
+      "features": {
+        "sync": "Таны хадгалсан тестийн хариултууд автоматаар синк хийгдэнэ",
+        "local_data": "Профайлын мэдээлэл локал хадгалагдана",
+        "auto_update": "Интернэт холболт сэргэснээр бүх өгөгдөл автоматаар шинэчлэгдэнэ",
+        "limited_features": "Ашигтай онлайн функцүүд хязгаарлагдмал байна"
+      }
+    }
+  },
+  "monitoring": {
+    "title": "Гүйцэтгэлийн хяналт",
+    "description": "Програмын гүйцэтгэл болон алдааны хяналт",
+    "metrics": {
+      "response_time": "Хариу өгөх хугацаа",
+      "error_rate": "Алдааны хувь",
+      "memory_usage": "Санах ойн ашиглалт",
+      "active_users": "Идэвхтэй хэрэглэгчид"
+    },
+    "web_vitals": "Core Web Vitals",
+    "system_health": "Системийн эрүүл мэнд",
+    "user_activity": "Хэрэглэгчдийн үйл ажиллагаа",
+    "test_buttons": {
+      "test_performance": "Гүйцэтгэл шалгах",
+      "test_error": "Алдаа илгээх"
+    }
+  },
+  "cache": {
+    "title": "Кэшийн удирдлага",
+    "description": "React Query болон хөтчийн кэш хяналт",
+    "metrics": {
+      "active_queries": "Идэвхтэй асуулгууд",
+      "cache_size": "Кэшийн хэмжээ",
+      "local_storage": "Local Storage",
+      "active_mutations": "Идэвхтэй өөрчлөлтүүд"
+    },
+    "tabs": {
+      "query_cache": "Query Cache",
+      "browser_storage": "Browser Storage",
+      "cache_settings": "Кэшийн тохиргоо"
+    },
+    "actions": {
+      "refresh": "Шинэчлэх",
+      "clear_all": "Бүгдийг цэвэрлэх",
+      "invalidate": "Хүчингүй болгох",
+      "remove": "Устгах"
+    }
+  }
+}

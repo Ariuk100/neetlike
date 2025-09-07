@@ -1,42 +1,89 @@
+/* PhysX — minimal global reset */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; }
+img, svg { display: block; max-width: 100%; height: auto; }
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a; /* slate-900-ish */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b1220;  /* dark background */
+    --foreground: #e2e8f0;  /* light foreground */
   }
 }
 
-html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  color: var(--foreground);
+  font-family: var(--font-noto-sans), sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+a { color: inherit; text-decoration: none; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-orbitron), sans-serif;
+}
+.custom-primary-btn {
+  background-color: #1677ff !important;
+  border-color: #1677ff !important;
+  color: #fff !important;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Зөвхөн light mode дээр өөрчлөлт оруулна */
+html:not(.dark) .light-blue-btn {
+  background-color: #1677ff !important;
+  border-color: #1677ff !important;
+  color: #fff !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+html:not(.dark) .light-blue-btn:hover,
+html:not(.dark) .light-blue-btn:focus {
+  background-color: #4096ff !important;
+  border-color: #4096ff !important;
+  color: #fff !important;
+}
+
+/* ✅ Animations - Performance optimized */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* ✅ Focus styles for better accessibility */
+.form-control:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* ✅ High contrast mode support */
+@media (prefers-contrast: high) {
+  .text-slate-400 {
+    color: #000 !important;
+  }
+  .dark .text-slate-400 {
+    color: #fff !important;
+  }
+}
+
+/* ✅ Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .transition-all {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
