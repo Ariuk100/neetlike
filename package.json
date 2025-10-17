@@ -3,12 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "echo '--- ТУРШИЛТ ЭХЭЛЛЭЭ ---' && echo 'TEST_VARIABLE-ийн утга: '$TEST_VARIABLE && echo '--- ТУРШИЛТ ДУУСЛАА ---'",
-    "start": "next start",
-    "lint": "next lint",
-    "preview:wrangler": "wrangler pages dev .next",
-    "dev:wrangler": "npm run build && npm run preview:wrangler"
+    "build": "npx @cloudflare/next-on-pages@1",
+    "next:build": "next build",
+    "prebuild": "echo '--- BUILD START ---'"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
