@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "echo '--- ТУРШИЛТ ЭХЭЛЛЭЭ ---' && echo 'TEST_VARIABLE-ийн утга: '$TEST_VARIABLE && echo '--- ТУРШИЛТ ДУУСЛАА ---'",
     "start": "next start",
     "lint": "next lint",
     "preview:wrangler": "wrangler pages dev .next",
