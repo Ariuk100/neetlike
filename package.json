@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "echo '--- CLOUDFLARE-ИЙН ТҮЛХҮҮРҮҮДИЙГ ШАЛГАЖ БАЙНА ---' && env | grep FIREBASE && echo '--- ШАЛГАЖ ДУУСЛАА, ОДОО BUILD ХИЙЖ ҮЗЬЕ ---' && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "preview:wrangler": "wrangler pages dev .next",
