@@ -1,0 +1,8 @@
+# wrangler.toml
+name = "physx"
+compatibility_date = "2025-10-17"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "PRIVATE_ASSETS"
+bucket_name = "physx"
