@@ -1,6 +1,8 @@
 // app/api/logout/route.ts
 import { NextResponse } from 'next/server'
-export const runtime = 'nodejs';
+
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 export async function POST() {
   const res = NextResponse.json({ status: 'logged out' })
@@ -9,19 +11,23 @@ export async function POST() {
   res.cookies.set('__session', '', {
     maxAge: 0,
     path: '/',
-    httpOnly: true, // login дээр хэрхэн өгсөн бол тэр адил
+    httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   })
 
-  // Хэрвээ user_role cookie байгаа бол устгана
+  // user_role cookie устгах
   res.cookies.set('user_role', '', {
     maxAge: 0,
     path: '/',
-    httpOnly: false, // Хэрэв client JS-с уншдаг бол false
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   })
 
   return res
+}
+
+export async function GET() {
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 })
 }
