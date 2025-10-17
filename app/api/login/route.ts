@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 type Role = 'student' | 'moderator' | 'teacher' | 'admin';
-type ErrorWithStatus = Error & { status?: number };
 type SignInResp = { idToken: string };
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!;

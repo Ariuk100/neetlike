@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 type Role = 'student' | 'moderator' | 'teacher' | 'admin';
-type ErrorWithStatus = Error & { status?: number };
 type D1Stmt = { bind: (...args: unknown[]) => { first: () => Promise<unknown | null>; run: () => Promise<unknown> } };
 type D1 = { prepare: (q: string) => D1Stmt };
 type EnvBindings = { PHYSX_DB?: D1 };

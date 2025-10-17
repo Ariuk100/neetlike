@@ -6,10 +6,6 @@ import { createRemoteJWKSet, jwtVerify, importPKCS8, SignJWT, JWTPayload } from 
 
 type Role = 'admin' | 'moderator' | 'teacher' | 'student';
 
-type EnvBindings = {
-  // add backend proxy bindings here if needed
-};
-
 type OAuthTokenResp = { access_token: string };
 type ErrorWithStatus = Error & { status?: number };
 
