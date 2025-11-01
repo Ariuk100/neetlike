@@ -2,8 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-// ✅ ЗАСВАРЛАСАН: Ашиглагдаагүй импортуудыг устгав
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/app/context/AuthContext';
 import { toast } from 'sonner';
@@ -32,7 +31,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 
-// Interfaces
 type Role = 'student' | 'teacher' | 'moderator' | 'admin';
 interface UserData {
   id: string; uid: string; email: string; name?: string; lastName?: string;
@@ -47,7 +45,6 @@ const toISODateString = (input: unknown): string | undefined => {
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asRole = (v: unknown): Role => (['student', 'teacher', 'moderator', 'admin'].includes(v as string) ? v as Role : 'student');
 
-
 export default function AdminUsersPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -56,6 +53,7 @@ export default function AdminUsersPage() {
   const [data, setData] = useState<UserData[]>([]);
   const [fetching, setFetching] = useState(true);
   const [deletingUid, setDeletingUid] = useState<string>('');
+  const [deletingLoading, setDeletingLoading] = useState<boolean>(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -82,7 +80,7 @@ export default function AdminUsersPage() {
         setFetching(false);
       }
 
-      const versionRes = await fetch('/api/admin/users-version');
+      const versionRes = await fetch('/api/admin/users-version'); // same-origin → cookies included
       if (!versionRes.ok) {
         toast.error("Серверийн хувилбар шалгахад алдаа гарлаа.");
         setFetching(false);
@@ -97,9 +95,9 @@ export default function AdminUsersPage() {
       
       unsub = onSnapshot(collection(db, 'users'), async (snap) => {
         const list: UserData[] = snap.docs.map((d) => ({
-            id: d.id, uid: d.id, email: asString(d.data().email), name: asString(d.data().name),
-            lastName: asString(d.data().lastName), phone: asString(d.data().phone), school: asString(d.data().school),
-            grade: asString(d.data().grade), role: asRole(d.data().role), createdAt: toISODateString(d.data().createdAt),
+          id: d.id, uid: d.id, email: asString(d.data().email), name: asString(d.data().name),
+          lastName: asString(d.data().lastName), phone: asString(d.data().phone), school: asString(d.data().school),
+          grade: asString(d.data().grade), role: asRole(d.data().role), createdAt: toISODateString(d.data().createdAt),
         }));
         setData(list);
         setFetching(false);
@@ -116,22 +114,31 @@ export default function AdminUsersPage() {
     loadUsers();
 
     return () => {
-      if(unsub) unsub();
+      if (unsub) unsub();
     };
   }, [user, cache, authLoading]);
 
   const handleRoleChange = async (uid: string, newRole: Role) => {
     const originalUser = data.find(u => u.uid === uid);
     if (!originalUser) return;
+
+    // ✅ UI-level guard: өөрийгөө non-admin болгохыг хориглоно (сервер ч хориглодог)
+    if (user?.uid === uid && newRole !== 'admin') {
+      toast.error("Өөрийн эрхийг admin-аас бууруулах боломжгүй.");
+      return;
+    }
+
+    // ✅ Optimistic UI, зөвхөн API дуудна (Firestore-г сервер mirror-дана)
     setData(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole } : u));
     try {
-      await updateDoc(doc(db, 'users', uid), { role: newRole });
       const resp = await fetch('/api/admin/set-user-role', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ uid, role: newRole }),
       });
       if (!resp.ok) {
-        const errJson = await resp.json().catch(() => ({}));
+        const errJson = await resp.json().catch(() => ({})) as { error?: string };
         throw new Error(errJson.error || 'Custom claim update failed');
       }
       toast.success(`"${originalUser.name || originalUser.email}"-н эрхийг сольлоо.`);
@@ -144,53 +151,133 @@ export default function AdminUsersPage() {
 
   const handleDelete = async () => {
     if (!deletingUid) return;
+
+    // ✅ UI-level guard: өөрийгөө устгах оролдлогыг хориглоно (сервер ч хориглодог)
+    if (user?.uid === deletingUid) {
+      toast.error("Өөрийгөө устгах боломжгүй.");
+      return;
+    }
+
+    setDeletingLoading(true);
     try {
       const resp = await fetch('/api/admin/delete-user', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ uid: deletingUid }),
       });
-       if (!resp.ok) {
-        const errJson = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(() => ({})) as { error?: string };
         throw new Error(errJson.error || 'User deletion failed');
-       }
-       toast.success("Хэрэглэгчийг амжилттай устгалаа.");
-       await cache.remove('admin_users_version', { storage: 'indexedDB' });
+      }
+      toast.success("Хэрэглэгчийг амжилттай устгалаа.");
+      await cache.remove('admin_users_version', { storage: 'indexedDB' });
+
+      // Оптимистик байдлаар жагсаалтаас түр зуур авч болно (snapshot бас шинэчилнэ)
+      setData(prev => prev.filter(u => u.uid !== deletingUid));
     } catch (e) {
-       toast.error("Устгахад алдаа гарлаа", { description: (e as Error).message });
+      toast.error("Устгахад алдаа гарлаа", { description: (e as Error).message });
     } finally {
-       setDeletingUid(''); setIsDeleteDialogOpen(false);
+      setDeletingLoading(false);
+      setDeletingUid('');
+      setIsDeleteDialogOpen(false);
     }
   };
   
   const columns: ColumnDef<UserData>[] = [
-    { id: "select", header: ({ table }) => (<Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)} aria-label="Select all" />), cell: ({ row }) => (<Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />), enableSorting: false, enableHiding: false, },
-    { accessorKey: "name", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Нэр <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { accessorKey: "lastName", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Овог <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { accessorKey: "email", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Имэйл <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { accessorKey: "role", header: "Эрх", cell: ({ row }) => { const u = row.original; return (<Select value={u.role} onValueChange={(r: Role) => handleRoleChange(u.uid, r)}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="moderator">Moderator</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select>) } },
-    { accessorKey: "phone", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Утас <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { accessorKey: "school", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Сургууль <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { accessorKey: "createdAt", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Бүртгүүлсэн <ArrowUpDown className="ml-2 h-4 w-4" /></Button>), },
-    { id: "actions", cell: ({ row }) => { const u = row.original; return (<DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Цэс нээх</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Үйлдлүүд</DropdownMenuLabel><DropdownMenuItem onClick={() => navigator.clipboard.writeText(u.uid)}>UID хуулах</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => router.push(`/admin/profile/${u.uid}`)}>Профайл засах</DropdownMenuItem><DropdownMenuItem className="text-destructive" onClick={() => { setDeletingUid(u.uid); setIsDeleteDialogOpen(true); }}>Устгах</DropdownMenuItem></DropdownMenuContent></DropdownMenu>); }, },
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    { accessorKey: "name", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Нэр <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    { accessorKey: "lastName", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Овог <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    { accessorKey: "email", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Имэйл <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    {
+      accessorKey: "role",
+      header: "Эрх",
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <Select value={u.role} onValueChange={(r: Role) => handleRoleChange(u.uid, r)}>
+            <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="moderator">Moderator</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+      }
+    },
+    { accessorKey: "phone", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Утас <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    { accessorKey: "school", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Сургууль <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    { accessorKey: "createdAt", header: ({ column }) => (<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Бүртгүүлсэн <ArrowUpDown className="ml-2 h-4 w-4" /></Button>) },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Цэс нээх</span><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Үйлдлүүд</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(u.uid)}>UID хуулах</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push(`/admin/profile/${u.uid}`)}>Профайл засах</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => { setDeletingUid(u.uid); setIsDeleteDialogOpen(true); }}
+              >
+                Устгах
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
   ];
 
   const table = useReactTable({
-    data, columns, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting, getSortedRowModel: getSortedRowModel(),
-    onColumnFiltersChange: setColumnFilters, getFilteredRowModel: getFilteredRowModel(),
+    data, columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     state: { sorting, columnFilters, rowSelection, globalFilter },
   });
 
   const stats = useMemo(() => ({
-      total: data.length,
-      students: data.filter(u => u.role === 'student').length,
-      teachers: data.filter(u => u.role === 'teacher').length,
-      admins: data.filter(u => u.role === 'admin' || u.role === 'moderator').length,
+    total: data.length,
+    students: data.filter(u => u.role === 'student').length,
+    teachers: data.filter(u => u.role === 'teacher').length,
+    admins: data.filter(u => u.role === 'admin' || u.role === 'moderator').length, // UI-д "Админууд" гэж харуулж байгаа тул moderator-уудыг хамруулж байна
   }), [data]);
 
-  if (authLoading || (fetching && !data.length)) { return <div className="p-6">Уншиж байна...</div>; }
+  if (authLoading || (fetching && !data.length)) {
+    return <div className="p-6">Уншиж байна...</div>;
+  }
   
   return (
     <main className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -246,15 +333,16 @@ export default function AdminUsersPage() {
               </Table>
             </div>
             <div className="flex items-center justify-end space-x-2 py-4">
-                <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} / {table.getFilteredRowModel().rows.length} мөр сонгогдсон.
-                </div>
-                <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Өмнөх</Button>
-                <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Дараах</Button>
+              <div className="flex-1 text-sm text-muted-foreground">
+                {table.getFilteredSelectedRowModel().rows.length} / {table.getFilteredRowModel().rows.length} мөр сонгогдсон.
+              </div>
+              <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Өмнөх</Button>
+              <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Дараах</Button>
             </div>
           </CardContent>
         </Card>
       </div>
+
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -264,9 +352,9 @@ export default function AdminUsersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Болих</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={!deletingUid}>
-                {deletingUid ? "Устгах" : <Loader2 className="h-4 w-4 animate-spin"/>}
+            <AlertDialogCancel disabled={deletingLoading}>Болих</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={!deletingUid || deletingLoading}>
+              {deletingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Устгах"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

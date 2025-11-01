@@ -4,36 +4,51 @@ import { FieldValue } from 'firebase-admin/firestore'
 
 export const runtime = 'nodejs'
 
+// ---- CSRF / CORS helpers ----
+const PROD_ALLOWED_ORIGINS = ['https://physx.mn', 'https://www.physx.mn'] as const
+const DEV_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'] as const
+
+function allowedOrigins(): readonly string[] {
+  return process.env.NODE_ENV === 'production'
+    ? PROD_ALLOWED_ORIGINS
+    : [...PROD_ALLOWED_ORIGINS, ...DEV_ALLOWED_ORIGINS]
+}
+function isAllowedOrigin(origin: string | null): boolean {
+  return !!origin && allowedOrigins().includes(origin)
+}
+function corsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = { 'Cache-Control': 'no-store', Vary: 'Origin' }
+  if (isAllowedOrigin(origin) && origin) {
+    headers['Access-Control-Allow-Origin'] = origin
+    headers['Access-Control-Allow-Credentials'] = 'true'
+    headers['Access-Control-Allow-Headers'] = 'content-type, authorization'
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+  }
+  return headers
+}
+
 // Клиентээс зөвшөөрөх түлхүүрүүд (passport байхгүй)
 const ALLOWED_PROFILE_FIELDS = [
   'name', 'lastName', 'phone', 'birthYear', 'gender',
   'province', 'district', 'school', 'grade', 'location',
 ] as const
-
 type AllowedKey = (typeof ALLOWED_PROFILE_FIELDS)[number]
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
 }
-function errMsg(e: unknown): string {
-  if (e instanceof Error) return e.message
-  if (typeof e === 'string') return e
-  try { return JSON.stringify(e) } catch { return String(e) }
-}
 
-// trim + хоосон бол undefined
+// --- Normalizers ---
 const normStr = (v: unknown) => {
   if (typeof v !== 'string') return undefined
   const t = v.trim()
   return t ? t : undefined
 }
-// 8 оронтой утас
 const normPhone = (v: unknown) => {
   if (typeof v !== 'string') return undefined
   const d = v.replace(/\D/g, '')
   return /^\d{8}$/.test(d) ? d : undefined
 }
-// Анги: 1–12 + 1 том үсэг (латин/кирилл)
 const G_LETTER = '[A-Za-zА-ЯЁӨҮ]'
 const gradeRe = new RegExp(`^([1-9]|1[0-2])${G_LETTER}$`)
 const normGrade = (v: unknown) => {
@@ -41,7 +56,6 @@ const normGrade = (v: unknown) => {
   const x = v.replace(/\s+/g, '').toUpperCase()
   return gradeRe.test(x) ? x : undefined
 }
-// Төрсөн он
 const normBirthYear = (v: unknown) => {
   if (v === null) return 'DELETE' as const
   if (v === undefined || v === '') return undefined
@@ -51,7 +65,6 @@ const normBirthYear = (v: unknown) => {
   return n
 }
 
-// `any` оронд илүү тодорхой type ашиглах
 type ProfileOutputValue = string | number | FieldValue
 function sanitizeProfile(input: unknown): Record<string, ProfileOutputValue> {
   const out: Record<string, ProfileOutputValue> = {}
@@ -65,7 +78,6 @@ function sanitizeProfile(input: unknown): Record<string, ProfileOutputValue> {
     if (v !== undefined) out[k] = v
   }
 
-  // `as Record<string, unknown>`-г ашиглан `any`-г солих
   const phone = normPhone((input as Record<string, unknown>).phone)
   if (phone !== undefined) out.phone = phone
 
@@ -98,27 +110,45 @@ async function verifyAuth(req: NextRequest) {
   throw new Error('Unauthorized')
 }
 
-// --- Custom claim-г баталгаажуулах (байхгүй бол student оноох) ---
-// *Өөрчлөлт*: claim солигдвол refresh token-уудыг revoke хийнэ
-async function ensureStudentClaim(uid: string): Promise<{ updated: boolean }> {
-  const user = await adminAuth.getUser(uid)
-  const currentClaims = (user.customClaims ?? {}) as Record<string, unknown>
-
-  if (currentClaims['role'] !== 'student') {
-    await adminAuth.setCustomUserClaims(uid, { ...currentClaims, role: 'student' })
-    await adminAuth.revokeRefreshTokens(uid)
-    return { updated: true }
+// ---- Preflight ----
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin')
+  if (!isAllowedOrigin(origin)) {
+    return new NextResponse(null, { status: 403, headers: corsHeaders(origin) })
   }
-  return { updated: false }
+  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
 }
 
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin')
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403, headers: corsHeaders(origin) })
+  }
+
+  // ---- Content-Type + size guard ----
+  const contentType = req.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.startsWith('application/json')) {
+    return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415, headers: corsHeaders(origin) })
+  }
+  const rawBody = await req.text()
+  const MAX_BYTES = 64 * 1024
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_BYTES) {
+    return NextResponse.json({ error: 'Payload Too Large' }, { status: 413, headers: corsHeaders(origin) })
+  }
+
   try {
+    // Safe JSON parse
+    let body: unknown
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {}
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders(origin) })
+    }
+
     const { uid, email } = await verifyAuth(req)
 
-    const body = (await req.json()) as { profileData?: unknown }
-    if (!('profileData' in (body ?? {}))) {
-      return NextResponse.json({ error: 'Missing profileData' }, { status: 400 })
+    if (!isRecord(body) || !('profileData' in body)) {
+      return NextResponse.json({ error: 'Missing profileData' }, { status: 400, headers: corsHeaders(origin) })
     }
 
     // зөвшөөрсөн түлхүүрүүдийг шүүнэ
@@ -130,7 +160,7 @@ export async function POST(req: NextRequest) {
     const profileData = sanitizeProfile(whitelisted)
 
     if (Object.keys(profileData).length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400, headers: corsHeaders(origin) })
     }
 
     const userDocRef = adminFirestore.collection('users').doc(uid)
@@ -141,18 +171,14 @@ export async function POST(req: NextRequest) {
     const oldPhone: string | undefined = (snap.exists ? (snap.data()?.phone as string | undefined) : undefined)
     const newPhone: string | undefined = profileData.phone as string | undefined
 
-    // --- ✅ Утасны атомик unique баталгаа (Optimized) ---
-    // 1) Шинэ хэрэглэгч + phone ирсэн бол newPhone-г эзэмшүүлэх
-    // 2) Хуучин хэрэглэгч phone-оо СОЛИВОЛ: шинэ дугаарыг эзэмшээд, хуучныг суллана
+    // --- Утасны атомик unique баталгаа ---
     if (newPhone) {
       const newPhoneRef = uniquePhones.doc(newPhone)
 
       if (isNew) {
-        // Шинэ хэрэглэгч - Simplified transaction
         await adminFirestore.runTransaction(async (tx) => {
           const lock = await tx.get(newPhoneRef)
           if (lock.exists && lock.data()?.uid !== uid) {
-            // `any`-г ашиглахгүйн тулд custom error object үүсгэх
             const error: Error & { status?: number } = new Error('Phone already in use')
             error.status = 409
             throw error
@@ -160,32 +186,24 @@ export async function POST(req: NextRequest) {
           tx.set(newPhoneRef, { uid, updatedAt: FieldValue.serverTimestamp() })
         })
       } else if (!isNew && newPhone !== oldPhone) {
-        // ✅ Хуучин + шинэ phone нэг transaction дотор хийх
         const oldPhoneRef = oldPhone ? uniquePhones.doc(oldPhone) : null
         await adminFirestore.runTransaction(async (tx) => {
-          // Parallel read operations (эдгээр нь async биш тул race condition байхгүй)
           const [newLock, oldLock] = await Promise.all([
             tx.get(newPhoneRef),
             oldPhoneRef ? tx.get(oldPhoneRef) : Promise.resolve(null)
           ])
-          
           if (newLock.exists && newLock.data()?.uid !== uid) {
             const error: Error & { status?: number } = new Error('Phone already in use')
             error.status = 409
             throw error
           }
-          
-          // Write operations
           tx.set(newPhoneRef, { uid, updatedAt: FieldValue.serverTimestamp() })
-          
-          // хуучныг суллах
           if (oldPhoneRef && oldLock?.exists && oldLock.data()?.uid === uid) {
             tx.delete(oldPhoneRef)
           }
         })
       }
     } else if (!isNew && oldPhone && ('phone' in profileData) && profileData.phone === undefined) {
-      // Хэрэв хэрэглэгч phone-оо ХОЁСНЫГ хүсэж байгаа (nullable UX), uniquePhones-оос суллана
       const oldPhoneRef = uniquePhones.doc(oldPhone)
       await adminFirestore.runTransaction(async (tx) => {
         const oldLock = await tx.get(oldPhoneRef)
@@ -196,14 +214,12 @@ export async function POST(req: NextRequest) {
     }
     // --- Утас баталгааны төгсгөл ---
 
-    let claimUpdated = false
-
     if (isNew) {
+      // ✅ ROLE-ийг энд хэзээ ч бүү бич—зөвхөн админ API өөрчилнө.
       await userDocRef.set(
         {
           uid,
           email,
-          role: 'student',
           ...profileData,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -217,30 +233,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const res = await ensureStudentClaim(uid)
-    claimUpdated = res.updated
-    const forceTokenRefresh = isNew || claimUpdated
-
+    // ✅ Custom claim/role-д хүрэхгүй. refresh/revoke хийхгүй.
     const payload = {
       success: true,
       message: 'User profile updated',
       isNew,
-      claimUpdated,
-      forceTokenRefresh,
+      claimUpdated: false,
+      forceTokenRefresh: false,
     }
 
-    return NextResponse.json(payload, { status: isNew ? 201 : 200 })
+    return NextResponse.json(payload, { status: isNew ? 201 : 200, headers: corsHeaders(origin) })
   } catch (e: unknown) {
-    console.error('register-profile error:', errMsg(e))
-    // `any`-г ашиглахгүйн тулд type-г шалгаад `status`-г авах
-    const status = (e && typeof e === 'object' && 'status' in e && typeof (e as { status: unknown }).status === 'number')
-      ? (e as { status: number }).status
-      : /unauthorized/i.test(errMsg(e)) ? 401 : 500
-    const msg = (e instanceof Error ? e.message : 'Internal server error')
-    return NextResponse.json({ error: msg }, { status })
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('register-profile error:', msg)
+
+    const status = ((): number => {
+      if (e && typeof e === 'object' && 'status' in e && typeof (e as { status: unknown }).status === 'number') {
+        return (e as { status: number }).status
+      }
+      if (/unauthorized/i.test(msg)) return 401
+      return 500
+    })()
+
+    const safeMessage = status === 401 ? 'Unauthorized' : 'Internal server error'
+    return NextResponse.json({ error: safeMessage }, { status, headers: corsHeaders(origin) })
   }
 }
 
-export async function GET() {
-  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 })
+export async function GET(req: NextRequest) {
+  const origin = req.headers.get('origin')
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405, headers: corsHeaders(origin) })
 }

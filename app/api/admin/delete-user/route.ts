@@ -52,7 +52,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden origin' }, { status: 403, headers: corsHeaders(origin) })
   }
 
+  // ---- Content-Type + size guard ----
+  const contentType = req.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.startsWith('application/json')) {
+    return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415, headers: corsHeaders(origin) })
+  }
+  const rawBody = await req.text()
+  const MAX_BYTES = 64 * 1024
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_BYTES) {
+    return NextResponse.json({ error: 'Payload Too Large' }, { status: 413, headers: corsHeaders(origin) })
+  }
+
   try {
+    // Safe JSON parse
+    let parsed: unknown
+    try {
+      parsed = rawBody ? JSON.parse(rawBody) : {}
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders(origin) })
+    }
+
+    // Админ эсэхийг session cookie-гоор шалгана
     const sessionCookie = req.cookies.get('__session')?.value
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders(origin) })
@@ -67,8 +87,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = (await req.json()) as { uid?: unknown }
-    const uid = typeof body.uid === 'string' ? body.uid.trim() : ''
+    // Body-аас uid-ийг төрөлтэйгөөр уншина
+    const uid = (() => {
+      if (parsed && typeof parsed === 'object' && 'uid' in parsed) {
+        const v = (parsed as { uid?: unknown }).uid
+        return typeof v === 'string' ? v.trim() : ''
+      }
+      return ''
+    })()
+
     if (!uid) {
       return NextResponse.json({ error: 'UID is required' }, { status: 400, headers: corsHeaders(origin) })
     }
@@ -100,15 +127,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (authDeleted && firestoreDeleted) {
-      return NextResponse.json({ success: true, message: `User ${uid} deleted from Auth & Firestore.` }, { status: 200, headers: corsHeaders(origin) })
+      return NextResponse.json(
+        { success: true, message: `User ${uid} deleted from Auth & Firestore.` },
+        { status: 200, headers: corsHeaders(origin) }
+      )
     }
     if (authDeleted && !firestoreDeleted) {
-      return NextResponse.json({ success: true, warning: 'Auth deleted but Firestore doc delete failed. Check logs.', uid }, { status: 200, headers: corsHeaders(origin) })
+      return NextResponse.json(
+        { success: true, warning: 'Auth deleted but Firestore doc delete failed. Check logs.', uid },
+        { status: 200, headers: corsHeaders(origin) }
+      )
     }
     return NextResponse.json({ error: 'Unknown state' }, { status: 500, headers: corsHeaders(origin) })
   } catch (e: unknown) {
     console.error('Error deleting user:', errMsg(e))
-    return NextResponse.json({ error: errMsg(e) || 'Failed to delete user' }, { status: 500, headers: corsHeaders(origin) })
+    // Клиентэд ерөнхий мессеж буцаана
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: corsHeaders(origin) }
+    )
   }
 }
 

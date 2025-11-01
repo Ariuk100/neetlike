@@ -54,8 +54,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden origin' }, { status: 403, headers: corsHeaders(origin) })
   }
 
+  // ---- Content-Type + size guard ----
+  const contentType = req.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.startsWith('application/json')) {
+    return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415, headers: corsHeaders(origin) })
+  }
+  const rawBody = await req.text()
+  const MAX_BYTES = 64 * 1024
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_BYTES) {
+    return NextResponse.json({ error: 'Payload Too Large' }, { status: 413, headers: corsHeaders(origin) })
+  }
+
   try {
-    // Админ эсэхийг session cookie‑гоор шалгана
+    // Safe JSON parse
+    let parsed: unknown
+    try {
+      parsed = rawBody ? JSON.parse(rawBody) : {}
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders(origin) })
+    }
+
+    // Админ эсэхийг session cookie-гоор шалгана
     const sessionCookie = req.cookies.get('__session')?.value
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders(origin) })
@@ -70,9 +89,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = (await req.json()) as { uid?: unknown; role?: unknown }
-    const uid = typeof body.uid === 'string' ? body.uid.trim() : ''
-    const role = typeof body.role === 'string' ? (body.role as Role) : undefined
+    // Body type-тайгаар унших
+    const uid = (() => {
+      if (parsed && typeof parsed === 'object' && 'uid' in parsed) {
+        const v = (parsed as { uid?: unknown }).uid
+        return typeof v === 'string' ? v.trim() : ''
+      }
+      return ''
+    })()
+    const role = (() => {
+      if (parsed && typeof parsed === 'object' && 'role' in parsed) {
+        const v = (parsed as { role?: unknown }).role
+        return typeof v === 'string' ? (v as Role) : undefined
+      }
+      return undefined
+    })()
+
     if (!uid) {
       return NextResponse.json({ error: 'UID is required' }, { status: 400, headers: corsHeaders(origin) })
     }
@@ -103,9 +135,11 @@ export async function POST(req: NextRequest) {
       { status: 200, headers: corsHeaders(origin) },
     )
   } catch (e: unknown) {
+    // Дотоод алдааг лог дээр үлдээнэ
     console.error('set-user-role error:', errMsg(e))
+    // Клиентэд ерөнхий мессеж л буцаана
     return NextResponse.json(
-      { error: errMsg(e) || 'Failed to set user role' },
+      { error: 'Internal server error' },
       { status: 500, headers: corsHeaders(origin) },
     )
   }

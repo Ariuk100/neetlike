@@ -51,76 +51,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(db, 'users', uid);
       if (firestoreUnsubscribeRef.current) firestoreUnsubscribeRef.current();
 
-      firestoreUnsubscribeRef.current = onSnapshot(userDocRef, (docSnap) => {
-        if (!isMountedRef.current) return;
-        
-        let firestoreUserData: Partial<CustomUser> = {};
-        if (docSnap.exists()) {
-          firestoreUserData = docSnap.data() as Partial<CustomUser>;
-        }
+      firestoreUnsubscribeRef.current = onSnapshot(
+        userDocRef,
+        (docSnap) => {
+          if (!isMountedRef.current) return;
 
-        const finalUser: CustomUser = {
-          uid: uid,
-          email: fbUser.email,
-          displayName: fbUser.displayName,
-          photoURL: fbUser.photoURL,
-          providerId: fbUser.providerData?.[0]?.providerId ?? "",
-          role: role as CustomUser['role'],
-          ...firestoreUserData,
-          name: firestoreUserData.name || fbUser.displayName || "Хэрэглэгч",
-        };
-        
-        setUser(finalUser);
-        setFirebaseUser(fbUser);
-        setLoading(false);
-      }, (firestoreError) => {
-        console.error("Firestore snapshot error:", firestoreError);
-        setError(firestoreError.message);
-        setLoading(false);
-      });
+          let firestoreUserData: Partial<CustomUser> = {};
+          if (docSnap.exists()) {
+            firestoreUserData = docSnap.data() as Partial<CustomUser>;
+          }
+
+          const finalUser: CustomUser = {
+            uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName,
+            photoURL: fbUser.photoURL,
+            providerId: fbUser.providerData?.[0]?.providerId ?? '',
+            role: role as CustomUser['role'],
+            ...firestoreUserData,
+            name: firestoreUserData.name || fbUser.displayName || 'Хэрэглэгч',
+          };
+
+          setUser(finalUser);
+          setFirebaseUser(fbUser);
+          setLoading(false);
+        },
+        (firestoreError) => {
+          console.error('Firestore snapshot error:', firestoreError);
+          setError(firestoreError.message);
+          setLoading(false);
+        },
+      );
     };
 
-    const authStateSubscription = onAuthStateChanged(auth, async (fbUser) => {
+    const authStateSubscription = onAuthStateChanged(auth, async (fbUserCurrent) => {
       if (!isMountedRef.current) return;
       if (firestoreUnsubscribeRef.current) firestoreUnsubscribeRef.current();
 
-      if (fbUser) {
-        // Хэрэглэгч клиент талд нэвтэрсэн үед
-        const tokenResult = await fbUser.getIdTokenResult();
+      if (fbUserCurrent) {
+        // ✅ Клиент талд нэвтэрсэн үед: ID token-оо force refresh хийгээд серверийн __session cookie-г синк
+        const tokenResult = await fbUserCurrent.getIdTokenResult(true);
+        try {
+          await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ token: tokenResult.token }),
+          });
+        } catch (e) {
+          // Session sync алдаа UI-г зогсоохгүй
+          console.error('Session sync (login) failed:', e);
+        }
+
         const role = (tokenResult.claims.role as string) || 'student';
-        handleUserSnapshot(fbUser.uid, role, fbUser);
+        handleUserSnapshot(fbUserCurrent.uid, role, fbUserCurrent);
       } else {
-        // Хөтчийг дахин нээх үед энд ажиллана
+        // ✅ Хөтчийг дахин нээх үед: серверийн session-оор сэргээх оролдлого
         try {
           const res = await fetch('/api/auth/verify-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
           });
-          
+
           if (res.ok && res.status !== 204) {
-            const { customToken } = await res.json() as { customToken?: string };
+            const { customToken } = (await res.json()) as { customToken?: string };
             if (customToken && isMountedRef.current) {
               // Серверээс ирсэн custom token-оор клиент талд дахин нэвтэрнэ.
-              // Энэ нь onAuthStateChanged-г дахин ажиллуулж, fbUser-тэй болгоно.
               await signInWithCustomToken(auth, customToken);
-              return; 
+
+              // ⬇️ sign-in хийсний дараа шинэ ID token авч __session cookie-г тавина
+              const freshIdToken = await auth.currentUser?.getIdToken(true);
+              if (freshIdToken) {
+                try {
+                  await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ token: freshIdToken }),
+                  });
+                } catch (e) {
+                  console.error('Session sync after custom sign-in failed:', e);
+                }
+              }
+              return;
             }
           }
-          
+
           // Сервер дээр ч session байхгүй бол бүрэн гарсан гэж үзнэ
-          if(isMountedRef.current) {
+          if (isMountedRef.current) {
             setUser(null);
             setFirebaseUser(null);
             setLoading(false);
           }
         } catch (e) {
-            console.error("Session verification fetch failed:", e);
-            if(isMountedRef.current) {
-                setUser(null);
-                setFirebaseUser(null);
-                setLoading(false);
-            }
+          console.error('Session verification fetch failed:', e);
+          if (isMountedRef.current) {
+            setUser(null);
+            setFirebaseUser(null);
+            setLoading(false);
+          }
         }
       }
     });
@@ -135,8 +165,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
-    } catch (error) {
-      console.error("Logout API failed:", error);
+    } catch (e) {
+      console.error('Logout API failed:', e);
     }
     await signOut(auth);
     if (isMountedRef.current) {
