@@ -1,0 +1,8 @@
+{
+    "students": [
+      { "id": "s001", "fullName": "Бат Эрдэнэ",     "grade": "10А", "code": "ABCD10" },
+      { "id": "s002", "fullName": "Саруул Тэмүүлэн", "grade": "10А", "code": "EFGH10" },
+      { "id": "s003", "fullName": "Номин Эрдэнэ",    "grade": "11Б", "code": "IJKL11" },
+      { "id": "s004", "fullName": "Тэмүүжин Амар",   "grade": "12В", "code": "MNOP12" }
+    ]
+  }

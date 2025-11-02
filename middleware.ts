@@ -122,6 +122,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Middleware-г статик файлууд болон API замаас бусад бүх зам дээр ажиллуулна
-    '/((?!api|_next/static|_next/image|assets|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|assets|favicon.ico|students.json).*)',
   ],
 }
