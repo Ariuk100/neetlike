@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,6 +49,11 @@ export default function SantPage() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startTime, setStartTime] = useState<string | null>(null);
 
+  // ⏱️ Таймерийг дахин давхардахгүй барих ref
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // beforeunload listener-ийг цэвэрлэхэд хэрэгтэй ref
+  const beforeUnloadHandlerRef = useRef<((e: BeforeUnloadEvent) => void) | null>(null);
+  const isEndedRef = useRef(false);
   // === Fetch students ===
   useEffect(() => {
     (async () => {
@@ -63,6 +68,14 @@ export default function SantPage() {
         setLoading(false);
       }
     })();
+
+    // Unmount: таймер/листенер цэвэрлэх хамгаалалт
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (beforeUnloadHandlerRef.current) {
+        window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
+      }
+    };
   }, []);
 
   const grades = useMemo(() => {
@@ -120,7 +133,7 @@ export default function SantPage() {
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFullscreen = document.fullscreenElement;
-      if (!isFullscreen && examStarted) {
+      if (!isFullscreen && examStarted && !isEndedRef.current) {
         toast.error('Fullscreen-ээс гарсан тул шалгалт дууслаа.');
         setExamStarted(false);
         endExam();
@@ -130,6 +143,57 @@ export default function SantPage() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [examStarted]);
+  // === Copy/Paste/Contextmenu-г бүхэл хуудсанд хориглох ===
+useEffect(() => {
+  const preventClipboard = (e: ClipboardEvent) => e.preventDefault();
+  const preventKeyCombos = (e: KeyboardEvent) => {
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a'].includes(k)) {
+      e.preventDefault();
+    }
+  };
+  const preventContext = (e: MouseEvent) => e.preventDefault();
+
+  document.addEventListener('copy', preventClipboard);
+  document.addEventListener('cut', preventClipboard);
+  document.addEventListener('paste', preventClipboard);
+  document.addEventListener('keydown', preventKeyCombos);
+  document.addEventListener('contextmenu', preventContext);
+
+  return () => {
+    document.removeEventListener('copy', preventClipboard);
+    document.removeEventListener('cut', preventClipboard);
+    document.removeEventListener('paste', preventClipboard);
+    document.removeEventListener('keydown', preventKeyCombos);
+    document.removeEventListener('contextmenu', preventContext);
+  };
+}, []);
+// === Tab солих, цонх идэвхгүй болохыг мэдрэх
+useEffect(() => {
+  if (!examStarted) return;
+
+  const handleHidden = () => {
+    if (document.hidden && !isEndedRef.current) {
+      toast.error('⚠️ Та өөр tab руу шилжлээ. Шалгалт дууслаа.');
+      endExam();
+    }
+  };
+
+  const handleBlur = () => {
+    if (!isEndedRef.current) {
+      toast.error('⚠️ Цонх идэвхгүй боллоо. Шалгалт дууслаа.');
+      endExam();
+    }
+  };
+
+  document.addEventListener('visibilitychange', handleHidden);
+  window.addEventListener('blur', handleBlur);
+
+  return () => {
+    document.removeEventListener('visibilitychange', handleHidden);
+    window.removeEventListener('blur', handleBlur);
+  };
+}, [examStarted]);
 
   // === Интернет тасрахад шалгалт дуусгах
   useEffect(() => {
@@ -143,10 +207,21 @@ export default function SantPage() {
 
   const startExam = async () => {
     const el = document.documentElement;
-    if (el.requestFullscreen) await el.requestFullscreen();
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen();
+    } catch {
+      // fullscreen амжаагүй байсан ч шалгалтыг үргэлжлүүлнэ
+    }
+
     setExamStarted(true);
+    isEndedRef.current = false;
     toast.success('Шалгалт эхэллээ!');
     setStartTime(new Date().toISOString());
+
+    setSolutions({});          // өмнөх бичсэн кодыг арилгана
+    setScores({});             // өмнөх оноог тэглэнэ
+    setResults({});            // өмнөх тестийн дэлгэрэнгүйг цэвэрлэнэ
+    setActiveTab(null);        // идэвхтэй табыг цэвэрлэнэ
 
     try {
       await fetch('/api/sant/exam', {
@@ -191,12 +266,16 @@ export default function SantPage() {
       setPyLoading(false);
     }
 
-    // ✅ 40 минут
+    // ✅ 40 минут — давхар гүйхээс хамгаалж хуучин таймерийг цэвэрлэнэ
     setTimeLeft(2400);
-    const timer = setInterval(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           toast.error('⏰ Хугацаа дууслаа!');
           endExam();
           return 0;
@@ -205,18 +284,59 @@ export default function SantPage() {
       });
     }, 1000);
 
-    window.addEventListener('beforeunload', () => {
-      clearInterval(timer);
-      endExam();
-    });
+    // beforeunload listener-ийг зөвхөн нэг удаа тавих
+    const handler = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (!isEndedRef.current) { // ✅ НЭМЭЛТ
+        endExam();
+      }
+    };
+    if (beforeUnloadHandlerRef.current) {
+      window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
+    }
+    beforeUnloadHandlerRef.current = handler as unknown as (e: BeforeUnloadEvent) => void;
+    window.addEventListener('beforeunload', beforeUnloadHandlerRef.current);
   };
 
   const endExam = async () => {
+    if (isEndedRef.current) return;   // ✅ НЭМЭЛТ: аль хэдийн дууссан бол гарах
+    isEndedRef.current = true; 
     if (showSummary) return;
     setShowSummary(true);
+
+    // таймер заавал зогсооно
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (beforeUnloadHandlerRef.current) {
+      window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
+      beforeUnloadHandlerRef.current = null;
+    }
+
     const endTime = new Date().toISOString();
     const duration =
       startTime ? Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) : null;
+      const payload = {
+        name: current?.name,
+        className: current?.class,
+        code: current?.code,
+        totalScore: Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
+        problems: problems.map((p) => ({
+          id: p.id,
+          title: p.title,
+          score: scores[p.id] ?? 0,
+          maxScore: p.maxScore,
+        })),
+        startTime,
+        endTime,
+        duration,
+      };
+    
+      console.log("📤 Илгээж буй дүн:", payload); // 👈 Энд харуулна
 
     try {
       await fetch('/api/sant/exam', {
@@ -255,6 +375,10 @@ export default function SantPage() {
     () => Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
     [scores]
   );
+  const totalMaxScore = useMemo(
+    () => problems.reduce((sum, p) => sum + p.maxScore, 0),
+    [problems]
+  );
 
   const runLocalJudge = async (problemId: string) => {
     const p = problems.find((x) => x.id === problemId);
@@ -289,7 +413,9 @@ result
           passedList.push(i + 1);
           details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
         }
-      } catch {}
+      } catch {
+        // алдаатай тестийг зүгээр алгасна — оноонд нөлөөлөхгүй
+      }
     }
 
     const total = p.tests.length;
@@ -301,6 +427,31 @@ result
     }));
     setRunning((r) => ({ ...r, [problemId]: false }));
     toast.success(`✅ ${passed}/${total} тест амжилттай! Оноо: ${score}`);
+    // 🟢 Оноо хадгалах PATCH дуудлага — santexam дээр оноог хадгална
+try {
+  // setScores дараа нь асинхрон тул шинэ оноог алдахгүйн тулд nextScores-г гаргаж авна
+  const nextScores = { ...scores, [problemId]: score };
+
+  // бүх бодлогын оноог бэлдэнэ
+  const payloadProblems = problems.map((pb) => ({
+    id: pb.id,
+    title: pb.title,
+    score: nextScores[pb.id] ?? 0,
+    maxScore: pb.maxScore,
+  }));
+
+  // сервер рүү илгээнэ
+  await fetch('/api/sant/exam', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: current!.code, // энэ нь сурагчийн код
+      problems: payloadProblems,
+    }),
+  });
+} catch {
+  toast.error('Түр хадгалах үед алдаа гарлаа.');
+}
   };
 
   const scoreClass = (problemId: string) => {
@@ -332,7 +483,7 @@ result
             </div>
 
             <p className="text-lg font-semibold text-center">
-              Нийт оноо: {totalScore} / {problems.reduce((a, b) => a + b.maxScore, 0)}
+              Нийт оноо: {totalScore} / {totalMaxScore}
             </p>
             <ul className="divide-y">
               {problems.map((p) => (
@@ -406,6 +557,12 @@ result
                 Дуусгах
               </Button>
             </div>
+            {/* ✅ Дээр нь нийт оноо тогтмол харуулна */}
+            <div className="mt-2 text-center">
+              <span className="text-base font-semibold">
+                Нийт оноо: {totalScore} / {totalMaxScore}
+              </span>
+            </div>
             <div className="text-center text-sm text-gray-600 mt-2">
               ⏳ Үлдсэн хугацаа:{' '}
               <span className={timeLeft < 300 ? 'text-red-600 font-semibold' : 'text-green-700'}>
@@ -433,14 +590,51 @@ result
                           <CardDescription>{p.description}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <Textarea
-                            className="min-h-[220px] font-mono"
-                            placeholder="Энд Python кодоо бичнэ үү..."
-                            value={solutions[p.id] || ''}
-                            onChange={(e) => setSolutions((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          />
+                        <Textarea
+  className="min-h-[220px] font-mono"
+  placeholder="Энд Python кодоо бичнэ үү..."
+  value={solutions[p.id] || ''}
+  onChange={(e) => setSolutions((prev) => ({ ...prev, [p.id]: e.target.value }))}
+  onKeyDown={(e) => {
+    // Tab → 4 space
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = e.target as HTMLTextAreaElement;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const value = target.value;
+      const insert = '    ';
+      const next = value.slice(0, start) + insert + value.slice(end);
+      setSolutions((prev) => ({ ...prev, [p.id]: next }));
+      requestAnimationFrame(() => {
+        target.selectionStart = target.selectionEnd = start + insert.length;
+      });
+    }
 
-                          {/* ✅ Давсан тестүүдийн чипс + дэлгэрэнгүйг буцааж харуулах хэсэг */}
+    // Enter → өмнөх мөрийн индент хадгалах
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = e.target as HTMLTextAreaElement;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const before = target.value.slice(0, start);
+      const after = target.value.slice(end);
+      const currentLine = before.split('\n').pop() ?? '';
+      const indent = currentLine.match(/^\s+/)?.[0] ?? '';
+      const next = before + '\n' + indent + after;
+      setSolutions((prev) => ({ ...prev, [p.id]: next }));
+      requestAnimationFrame(() => {
+        const pos = start + 1 + indent.length;
+        target.selectionStart = target.selectionEnd = pos;
+      });
+    }
+  }}
+  onCopy={(e) => e.preventDefault()}
+  onPaste={(e) => e.preventDefault()}
+  onCut={(e) => e.preventDefault()}
+/>
+
+                          {/* ✅ Давсан тестүүдийн чипс + дэлгэрэнгүй */}
                           {res && res.passedList.length > 0 && (
                             <>
                               <div className="flex flex-wrap gap-2">
@@ -527,9 +721,13 @@ result
             <label className="text-sm font-medium">Сурагчийн нэр</label>
             <Select value={fullName} onValueChange={(v) => setFullName(v.toString())} disabled={!grade}>
               <SelectTrigger><SelectValue placeholder="Нэр сонгох" /></SelectTrigger>
-              <SelectContent>
-                {filteredNames.map((n) => (<SelectItem key={n} value={n}>{n}</SelectItem>))}
-              </SelectContent>
+              <SelectContent className="max-h-64 overflow-y-auto">
+  {filteredNames.map((n) => (
+    <SelectItem key={n} value={n}>
+      {n}
+    </SelectItem>
+  ))}
+</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
