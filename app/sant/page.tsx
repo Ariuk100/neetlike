@@ -609,22 +609,34 @@ try {
       requestAnimationFrame(() => {
         target.selectionStart = target.selectionEnd = start + insert.length;
       });
+      return;
     }
 
-    // Enter → өмнөх мөрийн индент хадгалах
+    // Enter → өмнөх мөрийн индент хадгалах + мөр : -аар төгссөн бол 4 space нэмэх
     if (e.key === 'Enter') {
       e.preventDefault();
       const target = e.target as HTMLTextAreaElement;
       const start = target.selectionStart;
       const end = target.selectionEnd;
+
       const before = target.value.slice(0, start);
       const after = target.value.slice(end);
+
       const currentLine = before.split('\n').pop() ?? '';
-      const indent = currentLine.match(/^\s+/)?.[0] ?? '';
-      const next = before + '\n' + indent + after;
+      const baseIndent = currentLine.match(/^\s+/)?.[0] ?? '';
+
+      // мөр : -аар төгссөн эсэх
+      const trimmed = currentLine.trimEnd();
+      const needsExtra = trimmed.endsWith(':');
+
+      const extraIndent = needsExtra ? '    ' : '';
+      const insertText = '\n' + baseIndent + extraIndent;
+      const next = before + insertText + after;
+
       setSolutions((prev) => ({ ...prev, [p.id]: next }));
+
       requestAnimationFrame(() => {
-        const pos = start + 1 + indent.length;
+        const pos = start + insertText.length;
         target.selectionStart = target.selectionEnd = pos;
       });
     }
