@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import Practice from '@/components/sant/Practice';
 
 // ==== Pyodide types ====
 type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
@@ -144,30 +145,36 @@ export default function SantPage() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [examStarted]);
   // === Copy/Paste/Contextmenu-г бүхэл хуудсанд хориглох ===
-useEffect(() => {
-  const preventClipboard = (e: ClipboardEvent) => e.preventDefault();
-  const preventKeyCombos = (e: KeyboardEvent) => {
-    const k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a'].includes(k)) {
-      e.preventDefault();
+  useEffect(() => {
+    if (!examStarted) {
+      // шалгалт эхлээгүй бол listener тавихгүй, гэхдээ deps тогтмол
+      return;
     }
-  };
-  const preventContext = (e: MouseEvent) => e.preventDefault();
-
-  document.addEventListener('copy', preventClipboard);
-  document.addEventListener('cut', preventClipboard);
-  document.addEventListener('paste', preventClipboard);
-  document.addEventListener('keydown', preventKeyCombos);
-  document.addEventListener('contextmenu', preventContext);
-
-  return () => {
-    document.removeEventListener('copy', preventClipboard);
-    document.removeEventListener('cut', preventClipboard);
-    document.removeEventListener('paste', preventClipboard);
-    document.removeEventListener('keydown', preventKeyCombos);
-    document.removeEventListener('contextmenu', preventContext);
-  };
-}, []);
+  
+    const preventClipboard = (e: ClipboardEvent) => e.preventDefault();
+    const preventKeyCombos = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a'].includes(k)) {
+        e.preventDefault();
+      }
+    };
+    const preventContext = (e: MouseEvent) => e.preventDefault();
+  
+    document.addEventListener('copy', preventClipboard);
+    document.addEventListener('cut', preventClipboard);
+    document.addEventListener('paste', preventClipboard);
+    document.addEventListener('keydown', preventKeyCombos);
+    document.addEventListener('contextmenu', preventContext);
+  
+    // cleanup
+    return () => {
+      document.removeEventListener('copy', preventClipboard);
+      document.removeEventListener('cut', preventClipboard);
+      document.removeEventListener('paste', preventClipboard);
+      document.removeEventListener('keydown', preventKeyCombos);
+      document.removeEventListener('contextmenu', preventContext);
+    };
+  }, [examStarted]); // ✅ үргэлж ижил урттай (1)
 // === Tab солих, цонх идэвхгүй болохыг мэдрэх
 useEffect(() => {
   if (!examStarted) return;
@@ -749,6 +756,9 @@ try {
           <Button className="w-full" onClick={handleLogin}>Нэвтрэх</Button>
         </CardContent>
       </Card>
+      <div className="mt-6">
+  <Practice />
+</div>
     </main>
   );
 }
