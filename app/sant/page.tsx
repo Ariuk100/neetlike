@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import Practice from '@/components/sant/Practice';
+import Exam from '@/components/sant/Exam';
 
 // ==== Pyodide types ====
 type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
@@ -552,168 +553,24 @@ try {
   // === 2. Шалгалт эхэлсэн ===
   if (current && examStarted)
     return (
-      <main className="container mx-auto p-4 max-w-5xl">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>🧮 Шалгалт</CardTitle>
-                <CardDescription>{current.name} — {current.class}</CardDescription>
-              </div>
-              <Button variant="destructive" onClick={endExam}>
-                Дуусгах
-              </Button>
-            </div>
-            {/* ✅ Дээр нь нийт оноо тогтмол харуулна */}
-            <div className="mt-2 text-center">
-              <span className="text-base font-semibold">
-                Нийт оноо: {totalScore} / {totalMaxScore}
-              </span>
-            </div>
-            <div className="text-center text-sm text-gray-600 mt-2">
-              ⏳ Үлдсэн хугацаа:{' '}
-              <span className={timeLeft < 300 ? 'text-red-600 font-semibold' : 'text-green-700'}>
-                {Math.floor(timeLeft / 60)} мин {timeLeft % 60} сек
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {problems.length === 0 ? (
-              <p>Бодлогууд ачаалж байна...</p>
-            ) : (
-              <Tabs value={activeTab ?? undefined} onValueChange={setActiveTab}>
-                <TabsList>
-                  {problems.map((p) => (
-                    <TabsTrigger key={p.id} value={p.id}>{p.title}</TabsTrigger>
-                  ))}
-                </TabsList>
-                {problems.map((p) => {
-                  const res = results[p.id];
-                  return (
-                    <TabsContent key={p.id} value={p.id} className="mt-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>{p.title}</CardTitle>
-                          <CardDescription>{p.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                        <Textarea
-  className="min-h-[220px] font-mono"
-  placeholder="Энд Python кодоо бичнэ үү..."
-  value={solutions[p.id] || ''}
-  onChange={(e) => setSolutions((prev) => ({ ...prev, [p.id]: e.target.value }))}
-  onKeyDown={(e) => {
-    // Tab → 4 space
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.target as HTMLTextAreaElement;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const value = target.value;
-      const insert = '    ';
-      const next = value.slice(0, start) + insert + value.slice(end);
-      setSolutions((prev) => ({ ...prev, [p.id]: next }));
-      requestAnimationFrame(() => {
-        target.selectionStart = target.selectionEnd = start + insert.length;
-      });
-      return;
-    }
-
-    // Enter → өмнөх мөрийн индент хадгалах + мөр : -аар төгссөн бол 4 space нэмэх
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const target = e.target as HTMLTextAreaElement;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-
-      const before = target.value.slice(0, start);
-      const after = target.value.slice(end);
-
-      const currentLine = before.split('\n').pop() ?? '';
-      const baseIndent = currentLine.match(/^\s+/)?.[0] ?? '';
-
-      // мөр : -аар төгссөн эсэх
-      const trimmed = currentLine.trimEnd();
-      const needsExtra = trimmed.endsWith(':');
-
-      const extraIndent = needsExtra ? '    ' : '';
-      const insertText = '\n' + baseIndent + extraIndent;
-      const next = before + insertText + after;
-
-      setSolutions((prev) => ({ ...prev, [p.id]: next }));
-
-      requestAnimationFrame(() => {
-        const pos = start + insertText.length;
-        target.selectionStart = target.selectionEnd = pos;
-      });
-    }
-  }}
-  onCopy={(e) => e.preventDefault()}
-  onPaste={(e) => e.preventDefault()}
-  onCut={(e) => e.preventDefault()}
-/>
-
-                          {/* ✅ Давсан тестүүдийн чипс + дэлгэрэнгүй */}
-                          {res && res.passedList.length > 0 && (
-                            <>
-                              <div className="flex flex-wrap gap-2">
-                                {res.passedList.map((idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
-                                  >
-                                    ✓ Test {idx}
-                                  </span>
-                                ))}
-                              </div>
-
-                              <div className="mt-3 rounded-lg border bg-muted/30">
-                                <div className="px-3 py-2 text-xs font-semibold text-green-700">
-                                  Давсан тестүүдийн дэлгэрэнгүй
-                                </div>
-                                <ul className="divide-y text-sm">
-                                  {(res.details ?? []).map((d) => (
-                                    <li key={d.index} className="px-3 py-2">
-                                      <div className="mb-1 font-medium text-green-700">Test {d.index}</div>
-                                      <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-                                        <div>
-                                          <div className="text-xs text-muted-foreground">Input</div>
-                                          <pre className="rounded bg-background p-2 overflow-auto">{d.input}</pre>
-                                        </div>
-                                        <div>
-                                          <div className="text-xs text-muted-foreground">Expected</div>
-                                          <pre className="rounded bg-background p-2 overflow-auto">{d.expected}</pre>
-                                        </div>
-                                        <div>
-                                          <div className="text-xs text-muted-foreground">Output</div>
-                                          <pre className="rounded bg-background p-2 overflow-auto">{d.actual}</pre>
-                                        </div>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </>
-                          )}
-
-                          <div className="flex items-center justify-between">
-                            <Button onClick={() => runLocalJudge(p.id)} disabled={!pyodide || running[p.id]}>
-                              {running[p.id] ? 'Шалгаж байна…' : 'Код шалгах'}
-                            </Button>
-                            <span className={`text-sm ${scoreClass(p.id)}`}>
-                              Оноо: {scores[p.id] ?? 0} / {p.maxScore}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+      <Exam
+      current={current}
+      timeLeft={timeLeft}
+      totalScore={totalScore}
+      totalMaxScore={totalMaxScore}
+      problems={problems}
+      activeTab={activeTab}
+      setActiveTab={(v) => setActiveTab(v)}
+      results={results}
+      solutions={solutions}
+      setSolutions={setSolutions}
+      runLocalJudge={runLocalJudge}
+      pyodide={pyodide}
+      running={running}
+      scores={scores}
+      scoreClass={scoreClass}
+      endExam={endExam}
+    />
     );
 
   // === 3. Нэвтрээгүй ===

@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import ProblemRunner from '@/components/sant/ProblemRunner';
 
 // ==== Pyodide types ====
 type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
@@ -46,6 +46,7 @@ export default function Practice() {
   const [practiceSolutions, setPracticeSolutions] = useState<Record<string, string>>({});
   const [practiceResults, setPracticeResults] = useState<Record<string, RunResult | undefined>>({});
   const [practiceRunning, setPracticeRunning] = useState<Record<string, boolean>>({});
+  const [practiceErrors, setPracticeErrors] = useState<Record<string, string | null>>({});
   const [pyodide, setPyodide] = useState<Pyodide | null>(null);
   const [pyLoading, setPyLoading] = useState(false);
 
@@ -53,7 +54,6 @@ export default function Practice() {
     if (pyodide || pyLoading) return;
     try {
       setPyLoading(true);
-      // script байвал шууд
       await new Promise<void>((resolve, reject) => {
         const existing = document.querySelector(`script[src="${PYODIDE_URL}"]`);
         if (existing) return resolve();
@@ -66,7 +66,8 @@ export default function Practice() {
       const py = await window.loadPyodide();
       setPyodide(py);
       toast.success('Python бэлэн боллоо 🐍');
-    } catch {
+    } catch (err) {
+      console.error('Pyodide load error:', err);
       toast.error('Pyodide ачаалж чадсангүй.');
     } finally {
       setPyLoading(false);
@@ -93,6 +94,8 @@ export default function Practice() {
     if (!pyodide) return toast.error('Python интерпретер бэлэн биш байна.');
 
     setPracticeRunning((r) => ({ ...r, [problemId]: true }));
+    // өмнөх алдааг арилгана
+    setPracticeErrors((prev) => ({ ...prev, [problemId]: null }));
     toast.info('Код шалгаж байна...');
 
     let passed = 0;
@@ -111,6 +114,7 @@ ${indentBlock(userCode, 4)}
 result = _out.getvalue().strip()
 result
 `.trim();
+
         const ret = await pyodide.runPythonAsync(pySrc);
         const out = String(ret).trim();
         if (out === t.expectedOutput.trim()) {
@@ -118,8 +122,18 @@ result
           passedList.push(i + 1);
           details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
         }
-      } catch {
-        // алдаатайг алгасна
+      } catch (err) {
+        // энд синтакс гэх мэт алдааг барина
+        console.error('Run error:', err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+            ? err
+            : 'Тодорхойгүй алдаа гарлаа.';
+        setPracticeErrors((prev) => ({ ...prev, [problemId]: msg }));
+        // нэг тест дээр л алдаа гарсан бол цаашаа үргэлжлүүлэхгүй
+        break;
       }
     }
 
@@ -162,45 +176,21 @@ result
               const p = practiceProblems.find((x) => x.id === selectedPracticeId);
               if (!p) return null;
               const res = practiceResults[p.id];
+              const err = practiceErrors[p.id] ?? null;
               return (
-                <div className="space-y-3">
-                  <div className="rounded bg-muted/40 p-3 text-sm">
-                    <div className="font-semibold">{p.title}</div>
-                    <p className="text-muted-foreground">{p.description}</p>
-                    <p className="text-xs mt-2">Макс оноо: {p.maxScore}</p>
-                  </div>
-                  <Textarea
-                    className="min-h-[180px] font-mono"
-                    placeholder="Энд Python кодоо бичээд 'Код шалгах'-ыг дар."
-                    value={practiceSolutions[p.id] || ''}
-                    onChange={(e) =>
-                      setPracticeSolutions((prev) => ({ ...prev, [p.id]: e.target.value }))
-                    }
-                  />
-                  {res && (
-                    <div className="text-sm">
-                      ✅ {res.passed}/{res.total} тест давав.
-                      {res.passedList.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {res.passedList.map((idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs text-green-700"
-                            >
-                              ✓ Test {idx}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <Button
-                    onClick={() => runPracticeJudge(p.id)}
-                    disabled={!pyodide || practiceRunning[p.id]}
-                  >
-                    {practiceRunning[p.id] ? 'Шалгаж байна…' : 'Код шалгах'}
-                  </Button>
-                </div>
+                <ProblemRunner
+                  problem={p}
+                  value={practiceSolutions[p.id] || ''}
+                  onChange={(val) =>
+                    setPracticeSolutions((prev) => ({ ...prev, [p.id]: val }))
+                  }
+                  onRun={() => runPracticeJudge(p.id)}
+                  running={practiceRunning[p.id]}
+                  result={res}
+                  // дадлагад copy/paste зөв
+                  disableClipboard={false}
+                  errorMessage={err}
+                />
               );
             })()}
           </>
