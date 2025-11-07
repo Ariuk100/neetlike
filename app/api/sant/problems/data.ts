@@ -1404,7 +1404,8 @@ export const problems: Problem[] = [
       { input: '9\n', expectedOutput: '0\n2\n4\n6\n8\n' },
       { input: '11\n', expectedOutput: '0\n2\n4\n6\n8\n10\n' },
     ],
-  }
+  },
+  
 ];
 
 

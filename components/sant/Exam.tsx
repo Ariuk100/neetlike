@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import ProblemRunner from '@/components/sant/ProblemRunner';
 
 type TestCase = { input: string; expectedOutput: string };
-type Problem = { id: string; title: string; description: string; maxScore: number; tests: TestCase[] };
+type Problem = {
+  id: string;
+  title: string;
+  description: string;
+  maxScore: number;
+  tests: TestCase[];
+};
 type RunResult = {
   passed: number;
   total: number;
@@ -47,7 +53,7 @@ export default function Exam({
   solutions,
   setSolutions,
   runLocalJudge,
-  pyodide,
+  pyodide, // одоохондоо ашиглахгүй
   running,
   scores,
   scoreClass,
@@ -80,6 +86,7 @@ export default function Exam({
             </span>
           </div>
         </CardHeader>
+
         <CardContent>
           {problems.length === 0 ? (
             <p>Бодлогууд ачаалж байна...</p>
@@ -92,6 +99,7 @@ export default function Exam({
                   </TabsTrigger>
                 ))}
               </TabsList>
+
               {problems.map((p) => {
                 const res = results[p.id];
                 return (
@@ -110,11 +118,13 @@ export default function Exam({
                       result={res}
                       score={scores[p.id] ?? 0}
                       maxScore={p.maxScore}
-                      // шалгалт дээр хуулбар хаалттай
-                      disableClipboard={true}
+                      disableClipboard={true}    // хуулбарлахыг хориглоно
+                      showFailed={true}          // даваагүй тестүүдийг харуулна
+                      showOnlyFailed={true}      // зөвхөн унасан тестүүд + алдаа харуулна
                     />
-                    {/* хүсвэл энд оноог давхар гаргаад өгч болно */}
-                    {/* <div className={`mt-2 text-right text-sm ${scoreClass(p.id)}`}>
+
+                    {/* Хэрвээ оноог гаднаас харуулах бол энэ хэсгийг нээгээрэй:
+                    <div className={`mt-2 text-right text-sm ${scoreClass(p.id)}`}>
                       Оноо: {scores[p.id] ?? 0} / {p.maxScore}
                     </div> */}
                   </TabsContent>

@@ -66,8 +66,8 @@ export default function Practice() {
       const py = await window.loadPyodide();
       setPyodide(py);
       toast.success('Python бэлэн боллоо 🐍');
-    } catch (err) {
-      console.error('Pyodide load error:', err);
+    } catch {
+      // console.error-г авсан
       toast.error('Pyodide ачаалж чадсангүй.');
     } finally {
       setPyLoading(false);
@@ -94,7 +94,7 @@ export default function Practice() {
     if (!pyodide) return toast.error('Python интерпретер бэлэн биш байна.');
 
     setPracticeRunning((r) => ({ ...r, [problemId]: true }));
-    // өмнөх алдааг арилгана
+    // өмнөх алдааг цэвэрлэнэ
     setPracticeErrors((prev) => ({ ...prev, [problemId]: null }));
     toast.info('Код шалгаж байна...');
 
@@ -123,8 +123,7 @@ result
           details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
         }
       } catch (err) {
-        // энд синтакс гэх мэт алдааг барина
-        console.error('Run error:', err);
+        // console.error-г АВСАН
         const msg =
           err instanceof Error
             ? err.message
@@ -132,7 +131,6 @@ result
             ? err
             : 'Тодорхойгүй алдаа гарлаа.';
         setPracticeErrors((prev) => ({ ...prev, [problemId]: msg }));
-        // нэг тест дээр л алдаа гарсан бол цаашаа үргэлжлүүлэхгүй
         break;
       }
     }
@@ -187,9 +185,9 @@ result
                   onRun={() => runPracticeJudge(p.id)}
                   running={practiceRunning[p.id]}
                   result={res}
-                  // дадлагад copy/paste зөв
                   disableClipboard={false}
                   errorMessage={err}
+                  showFailed={true}
                 />
               );
             })()}

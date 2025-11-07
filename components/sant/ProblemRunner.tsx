@@ -38,6 +38,10 @@ interface ProblemRunnerProps {
   maxScore?: number;
   disableClipboard?: boolean;
   errorMessage?: string | null;
+  // practice-д true, exam-д false гэж дамжуул
+  showFailed?: boolean;
+  // exam-д зөвхөн унасан тестүүдийг харагдуулах гэж
+  showOnlyFailed?: boolean;
 }
 
 export default function ProblemRunner({
@@ -51,10 +55,14 @@ export default function ProblemRunner({
   maxScore,
   disableClipboard = false,
   errorMessage,
+  showFailed = true,
+  showOnlyFailed = false,
 }: ProblemRunnerProps) {
+  // мөрийн дугаар
   const lineCount = value.split('\n').length || 1;
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
+  // даваагүй тестүүдийг шүүж авах
   const passedIdx = new Set(result?.passedList ?? []);
   const failedTests =
     result && result.total
@@ -88,6 +96,7 @@ export default function ProblemRunner({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => {
+              // Tab → 4 space
               if (e.key === 'Tab') {
                 e.preventDefault();
                 const target = e.target as HTMLTextAreaElement;
@@ -101,6 +110,7 @@ export default function ProblemRunner({
                 });
                 return;
               }
+              // Enter → индент хадгалах, ':' бол 4 space
               if (e.key === 'Enter') {
                 e.preventDefault();
                 const target = e.target as HTMLTextAreaElement;
@@ -129,7 +139,19 @@ export default function ProblemRunner({
           />
         </div>
 
-        {/* pyodide алдаа */}
+        {/* товч – textarea-ийн доор */}
+        <div className="flex items-center justify-between gap-4">
+          <Button onClick={onRun} disabled={running}>
+            {running ? 'Шалгаж байна…' : 'Код шалгах'}
+          </Button>
+          {typeof score === 'number' && typeof maxScore === 'number' && (
+            <span className="text-sm">
+              Оноо: {score} / {maxScore}
+            </span>
+          )}
+        </div>
+
+        {/* pyodide-с ирсэн алдаа */}
         {errorMessage ? (
           <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 whitespace-pre-wrap">
             {errorMessage}
@@ -144,26 +166,31 @@ export default function ProblemRunner({
 
             {/* tag-ууд */}
             <div className="flex flex-wrap gap-2">
-              {result.passedList.map((idx) => (
-                <span
-                  key={`pass-${idx}`}
-                  className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
-                >
-                  ✓ Test {idx}
-                </span>
-              ))}
-              {failedTests.map((idx) => (
-                <span
-                  key={`fail-${idx}`}
-                  className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700"
-                >
-                  ✗ Test {idx}
-                </span>
-              ))}
+              {/* passed-ууд – зөвхөн showOnlyFailed биш тохиолдолд */}
+              {!showOnlyFailed &&
+                result.passedList.map((idx) => (
+                  <span
+                    key={`pass-${idx}`}
+                    className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
+                  >
+                    ✓ Test {idx}
+                  </span>
+                ))}
+
+              {/* failed-ууд – showFailed=true үед */}
+              {showFailed &&
+                failedTests.map((idx) => (
+                  <span
+                    key={`fail-${idx}`}
+                    className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700"
+                  >
+                    ✗ Test {idx}
+                  </span>
+                ))}
             </div>
 
-            {/* passed details */}
-            {result.details?.length ? (
+            {/* Давсан тестүүдийн дэлгэрэнгүй – зөвхөн showOnlyFailed биш үед */}
+            {!showOnlyFailed && result.details?.length ? (
               <div className="mt-3 rounded-lg border bg-muted/30">
                 <div className="px-3 py-2 text-xs font-semibold text-green-700">
                   Давсан тестүүдийн дэлгэрэнгүй
@@ -192,8 +219,8 @@ export default function ProblemRunner({
               </div>
             ) : null}
 
-            {/* failed details */}
-            {failedTests.length > 0 && (
+            {/* Даваагүй тестүүд – showFailed=true үед */}
+            {showFailed && failedTests.length > 0 && (
               <div className="mt-3 rounded-lg border bg-muted/30">
                 <div className="px-3 py-2 text-xs font-semibold text-red-700">
                   Даваагүй тестүүдийн дэлгэрэнгүй
@@ -233,17 +260,6 @@ export default function ProblemRunner({
             )}
           </>
         )}
-
-        <div className="flex items-center justify-between gap-4">
-          <Button onClick={onRun} disabled={running}>
-            {running ? 'Шалгаж байна…' : 'Код шалгах'}
-          </Button>
-          {typeof score === 'number' && typeof maxScore === 'number' && (
-            <span className="text-sm">
-              Оноо: {score} / {maxScore}
-            </span>
-          )}
-        </div>
       </CardContent>
     </Card>
   );
