@@ -5,15 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import Practice from '@/components/sant/Practice';
 import Exam from '@/components/sant/Exam';
 
 // ==== Pyodide types ====
 type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
-declare global { interface Window { loadPyodide: () => Promise<Pyodide>; } }
+declare global {
+  interface Window {
+    loadPyodide: () => Promise<Pyodide>;
+  }
+}
 
 // ==== Types ====
 type Student = { class: string; code: string; name: string };
@@ -51,11 +53,10 @@ export default function SantPage() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startTime, setStartTime] = useState<string | null>(null);
 
-  // ⏱️ Таймерийг дахин давхардахгүй барих ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  // beforeunload listener-ийг цэвэрлэхэд хэрэгтэй ref
   const beforeUnloadHandlerRef = useRef<((e: BeforeUnloadEvent) => void) | null>(null);
   const isEndedRef = useRef(false);
+
   // === Fetch students ===
   useEffect(() => {
     (async () => {
@@ -71,7 +72,6 @@ export default function SantPage() {
       }
     })();
 
-    // Unmount: таймер/листенер цэвэрлэх хамгаалалт
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (beforeUnloadHandlerRef.current) {
@@ -88,7 +88,10 @@ export default function SantPage() {
 
   const filteredNames = useMemo(() => {
     if (!grade) return [];
-    return students.filter((s) => s.class === grade).map((s) => s.name).sort();
+    return students
+      .filter((s) => s.class === grade)
+      .map((s) => s.name)
+      .sort();
   }, [grade, students]);
 
   const handleLogin = async () => {
@@ -145,13 +148,11 @@ export default function SantPage() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [examStarted]);
-  // === Copy/Paste/Contextmenu-г бүхэл хуудсанд хориглох ===
+
+  // === Copy/Paste/Contextmenu-г шалгалтын үед хориглох
   useEffect(() => {
-    if (!examStarted) {
-      // шалгалт эхлээгүй бол listener тавихгүй, гэхдээ deps тогтмол
-      return;
-    }
-  
+    if (!examStarted) return;
+
     const preventClipboard = (e: ClipboardEvent) => e.preventDefault();
     const preventKeyCombos = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -160,14 +161,13 @@ export default function SantPage() {
       }
     };
     const preventContext = (e: MouseEvent) => e.preventDefault();
-  
+
     document.addEventListener('copy', preventClipboard);
     document.addEventListener('cut', preventClipboard);
     document.addEventListener('paste', preventClipboard);
     document.addEventListener('keydown', preventKeyCombos);
     document.addEventListener('contextmenu', preventContext);
-  
-    // cleanup
+
     return () => {
       document.removeEventListener('copy', preventClipboard);
       document.removeEventListener('cut', preventClipboard);
@@ -175,35 +175,36 @@ export default function SantPage() {
       document.removeEventListener('keydown', preventKeyCombos);
       document.removeEventListener('contextmenu', preventContext);
     };
-  }, [examStarted]); // ✅ үргэлж ижил урттай (1)
-// === Tab солих, цонх идэвхгүй болохыг мэдрэх
-useEffect(() => {
-  if (!examStarted) return;
+  }, [examStarted]);
 
-  const handleHidden = () => {
-    if (document.hidden && !isEndedRef.current) {
-      toast.error('⚠️ Та өөр tab руу шилжлээ. Шалгалт дууслаа.');
-      endExam();
-    }
-  };
+  // === Tab солих, цонх идэвхгүй болох
+  useEffect(() => {
+    if (!examStarted) return;
 
-  const handleBlur = () => {
-    if (!isEndedRef.current) {
-      toast.error('⚠️ Цонх идэвхгүй боллоо. Шалгалт дууслаа.');
-      endExam();
-    }
-  };
+    const handleHidden = () => {
+      if (document.hidden && !isEndedRef.current) {
+        toast.error('⚠️ Та өөр tab руу шилжлээ. Шалгалт дууслаа.');
+        endExam();
+      }
+    };
 
-  document.addEventListener('visibilitychange', handleHidden);
-  window.addEventListener('blur', handleBlur);
+    const handleBlur = () => {
+      if (!isEndedRef.current) {
+        toast.error('⚠️ Цонх идэвхгүй боллоо. Шалгалт дууслаа.');
+        endExam();
+      }
+    };
 
-  return () => {
-    document.removeEventListener('visibilitychange', handleHidden);
-    window.removeEventListener('blur', handleBlur);
-  };
-}, [examStarted]);
+    document.addEventListener('visibilitychange', handleHidden);
+    window.addEventListener('blur', handleBlur);
 
-  // === Интернет тасрахад шалгалт дуусгах
+    return () => {
+      document.removeEventListener('visibilitychange', handleHidden);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [examStarted]);
+
+  // === Интернет тасрах
   useEffect(() => {
     const handleOffline = () => {
       toast.error('⚠️ Интернет тасарлаа. Шалгалт автоматаар дуусаж байна.');
@@ -217,20 +218,19 @@ useEffect(() => {
     const el = document.documentElement;
     try {
       if (el.requestFullscreen) await el.requestFullscreen();
-    } catch {
-      // fullscreen амжаагүй байсан ч шалгалтыг үргэлжлүүлнэ
-    }
+    } catch {}
 
     setExamStarted(true);
     isEndedRef.current = false;
     toast.success('Шалгалт эхэллээ!');
     setStartTime(new Date().toISOString());
 
-    setSolutions({});          // өмнөх бичсэн кодыг арилгана
-    setScores({});             // өмнөх оноог тэглэнэ
-    setResults({});            // өмнөх тестийн дэлгэрэнгүйг цэвэрлэнэ
-    setActiveTab(null);        // идэвхтэй табыг цэвэрлэнэ
+    setSolutions({});
+    setScores({});
+    setResults({});
+    setActiveTab(null);
 
+    // server дээр "эхэлсэн" гэж үлдээе
     try {
       await fetch('/api/sant/exam', {
         method: 'POST',
@@ -245,6 +245,7 @@ useEffect(() => {
       toast.error('Шалгалт бүртгэхэд алдаа гарлаа.');
     }
 
+    // бодлого
     try {
       const res = await fetch('/api/sant/problems', { cache: 'no-store' });
       const data = (await res.json()) as Problem[];
@@ -254,6 +255,7 @@ useEffect(() => {
       toast.error('Бодлого ачаалж чадсангүй.');
     }
 
+    // pyodide
     try {
       setPyLoading(true);
       await new Promise<void>((resolve, reject) => {
@@ -274,7 +276,7 @@ useEffect(() => {
       setPyLoading(false);
     }
 
-    // ✅ 40 минут — давхар гүйхээс хамгаалж хуучин таймерийг цэвэрлэнэ
+    // 40 минутын таймер
     setTimeLeft(2400);
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
@@ -292,13 +294,13 @@ useEffect(() => {
       });
     }, 1000);
 
-    // beforeunload listener-ийг зөвхөн нэг удаа тавих
+    // beforeunload
     const handler = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      if (!isEndedRef.current) { // ✅ НЭМЭЛТ
+      if (!isEndedRef.current) {
         endExam();
       }
     };
@@ -310,12 +312,11 @@ useEffect(() => {
   };
 
   const endExam = async () => {
-    if (isEndedRef.current) return;   // ✅ НЭМЭЛТ: аль хэдийн дууссан бол гарах
-    isEndedRef.current = true; 
-    if (showSummary) return;
-    setShowSummary(true);
+    if (isEndedRef.current) return;
+    isEndedRef.current = true;
+    if (!showSummary) setShowSummary(true);
 
-    // таймер заавал зогсооно
+    // таймер зогсооно
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -328,52 +329,54 @@ useEffect(() => {
     const endTime = new Date().toISOString();
     const duration =
       startTime ? Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) : null;
-      const payload = {
-        name: current?.name,
-        className: current?.class,
-        code: current?.code,
-        totalScore: Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
-        problems: problems.map((p) => ({
-          id: p.id,
-          title: p.title,
-          score: scores[p.id] ?? 0,
-          maxScore: p.maxScore,
-        })),
-        startTime,
-        endTime,
-        duration,
-      };
-    
-      console.log("📤 Илгээж буй дүн:", payload); // 👈 Энд харуулна
 
-    try {
-      await fetch('/api/sant/exam', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: current?.name,
-          className: current?.class,
-          code: current?.code,
-          totalScore: Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
-          problems: problems.map((p) => ({
-            id: p.id,
-            title: p.title,
-            score: scores[p.id] ?? 0,
-            maxScore: p.maxScore,
-          })),
-          startTime,
-          endTime,
-          duration,
-        }),
-      });
-    } catch {
-      toast.error('Дүн илгээхэд алдаа гарлаа.');
+    // сервер рүү явуулах payload-ийг нэг л удаа хийж авна
+    const finalPayload = {
+      name: current?.name,
+      className: current?.class,
+      code: current?.code,
+      totalScore: Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
+      problems: problems.map((p) => ({
+        id: p.id,
+        title: p.title,
+        score: scores[p.id] ?? 0,
+        maxScore: p.maxScore,
+      })),
+      startTime,
+      endTime,
+      duration,
+    };
+
+    const json = JSON.stringify(finalPayload);
+
+    // 1) sendBeacon-р оролдоно
+    let sent = false;
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([json], { type: 'application/json' });
+      sent = navigator.sendBeacon('/api/sant/exam', blob);
     }
 
+    // 2) хэрвээ beacon болоогүй бол fetch keepalive
+    if (!sent) {
+      try {
+        await fetch('/api/sant/exam', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: json,
+          keepalive: true,
+        });
+      } catch {
+        toast.error('Дүн илгээхэд алдаа гарлаа.');
+      }
+    }
+
+    // fullscreen-с гаргана
     try {
       if (document.fullscreenElement && document.exitFullscreen) {
         await document.exitFullscreen();
       }
+    } catch {
+      // ignore
     } finally {
       setShowSummary(true);
     }
@@ -383,10 +386,7 @@ useEffect(() => {
     () => Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
     [scores]
   );
-  const totalMaxScore = useMemo(
-    () => problems.reduce((sum, p) => sum + p.maxScore, 0),
-    [problems]
-  );
+  const totalMaxScore = useMemo(() => problems.reduce((sum, p) => sum + p.maxScore, 0), [problems]);
 
   const runLocalJudge = async (problemId: string) => {
     const p = problems.find((x) => x.id === problemId);
@@ -420,9 +420,11 @@ result
           passed++;
           passedList.push(i + 1);
           details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
+        } else {
+          // алга, шалгалт дээр унагасан тестийг detail-д хиймээр байвал энд хийж болно
         }
       } catch {
-        // алдаатай тестийг зүгээр алгасна — оноонд нөлөөлөхгүй
+        // алдаатай тестийг зүгээр алгасна
       }
     }
 
@@ -435,31 +437,28 @@ result
     }));
     setRunning((r) => ({ ...r, [problemId]: false }));
     toast.success(`✅ ${passed}/${total} тест амжилттай! Оноо: ${score}`);
-    // 🟢 Оноо хадгалах PATCH дуудлага — santexam дээр оноог хадгална
-try {
-  // setScores дараа нь асинхрон тул шинэ оноог алдахгүйн тулд nextScores-г гаргаж авна
-  const nextScores = { ...scores, [problemId]: score };
 
-  // бүх бодлогын оноог бэлдэнэ
-  const payloadProblems = problems.map((pb) => ({
-    id: pb.id,
-    title: pb.title,
-    score: nextScores[pb.id] ?? 0,
-    maxScore: pb.maxScore,
-  }));
+    // оноо түр хадгалах
+    try {
+      const nextScores = { ...scores, [problemId]: score };
+      const payloadProblems = problems.map((pb) => ({
+        id: pb.id,
+        title: pb.title,
+        score: nextScores[pb.id] ?? 0,
+        maxScore: pb.maxScore,
+      }));
 
-  // сервер рүү илгээнэ
-  await fetch('/api/sant/exam', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code: current!.code, // энэ нь сурагчийн код
-      problems: payloadProblems,
-    }),
-  });
-} catch {
-  toast.error('Түр хадгалах үед алдаа гарлаа.');
-}
+      await fetch('/api/sant/exam', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: current!.code,
+          problems: payloadProblems,
+        }),
+      });
+    } catch {
+      toast.error('Түр хадгалах үед алдаа гарлаа.');
+    }
   };
 
   const scoreClass = (problemId: string) => {
@@ -479,14 +478,22 @@ try {
         <Card className="max-w-lg w-full">
           <CardHeader>
             <CardTitle>✅ Шалгалт дууслаа</CardTitle>
-            <CardDescription>{current?.name} — {current?.class}</CardDescription>
+            <CardDescription>
+              {current?.name} — {current?.class}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <div className="grid gap-2 sm:grid-cols-3">
-                <div><span className="text-muted-foreground">Нэр:</span> {current?.name ?? '-'}</div>
-                <div><span className="text-muted-foreground">Анги:</span> {current?.class ?? '-'}</div>
-                <div><span className="text-muted-foreground">Код:</span> {current?.code ?? '-'}</div>
+                <div>
+                  <span className="text-muted-foreground">Нэр:</span> {current?.name ?? '-'}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Анги:</span> {current?.class ?? '-'}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Код:</span> {current?.code ?? '-'}
+                </div>
               </div>
             </div>
 
@@ -526,7 +533,9 @@ try {
         <Card>
           <CardHeader>
             <CardTitle>🎓 Sant шалгалтын анхааруулга</CardTitle>
-            <CardDescription>{current.name} — {current.class}</CardDescription>
+            <CardDescription>
+              {current.name} — {current.class}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <ul className="list-disc ml-6 space-y-2 text-sm">
@@ -537,11 +546,16 @@ try {
               <li>Шалгалтын үеэр интернет тасарвал автоматаар хадгалагдана.</li>
             </ul>
 
-            <Button onClick={startExam} className="w-full">Шалгалт эхлүүлэх</Button>
+            <Button onClick={startExam} className="w-full">
+              Шалгалт эхлүүлэх
+            </Button>
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => { sessionStorage.removeItem('sant_student'); setCurrent(null); }}
+              onClick={() => {
+                sessionStorage.removeItem('sant_student');
+                setCurrent(null);
+              }}
             >
               Гарах
             </Button>
@@ -554,23 +568,23 @@ try {
   if (current && examStarted)
     return (
       <Exam
-      current={current}
-      timeLeft={timeLeft}
-      totalScore={totalScore}
-      totalMaxScore={totalMaxScore}
-      problems={problems}
-      activeTab={activeTab}
-      setActiveTab={(v) => setActiveTab(v)}
-      results={results}
-      solutions={solutions}
-      setSolutions={setSolutions}
-      runLocalJudge={runLocalJudge}
-      pyodide={pyodide}
-      running={running}
-      scores={scores}
-      scoreClass={scoreClass}
-      endExam={endExam}
-    />
+        current={current}
+        timeLeft={timeLeft}
+        totalScore={totalScore}
+        totalMaxScore={totalMaxScore}
+        problems={problems}
+        activeTab={activeTab}
+        setActiveTab={(v) => setActiveTab(v)}
+        results={results}
+        solutions={solutions}
+        setSolutions={setSolutions}
+        runLocalJudge={runLocalJudge}
+        pyodide={pyodide}
+        running={running}
+        scores={scores}
+        scoreClass={scoreClass}
+        endExam={endExam}
+      />
     );
 
   // === 3. Нэвтрээгүй ===
@@ -587,35 +601,45 @@ try {
           <div className="space-y-2">
             <label className="text-sm font-medium">Анги</label>
             <Select value={grade} onValueChange={(v) => setGrade(v.toString())}>
-              <SelectTrigger><SelectValue placeholder="Анги сонгох" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Анги сонгох" />
+              </SelectTrigger>
               <SelectContent>
-                {grades.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                {grades.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Сурагчийн нэр</label>
             <Select value={fullName} onValueChange={(v) => setFullName(v.toString())} disabled={!grade}>
-              <SelectTrigger><SelectValue placeholder="Нэр сонгох" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Нэр сонгох" />
+              </SelectTrigger>
               <SelectContent className="max-h-64 overflow-y-auto">
-  {filteredNames.map((n) => (
-    <SelectItem key={n} value={n}>
-      {n}
-    </SelectItem>
-  ))}
-</SelectContent>
+                {filteredNames.map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Код</label>
             <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Код оруулах" />
           </div>
-          <Button className="w-full" onClick={handleLogin}>Нэвтрэх</Button>
+          <Button className="w-full" onClick={handleLogin}>
+            Нэвтрэх
+          </Button>
         </CardContent>
       </Card>
       <div className="mt-6">
-  <Practice />
-</div>
+        <Practice />
+      </div>
     </main>
   );
 }

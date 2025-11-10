@@ -2,10 +2,96 @@
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { NextResponse } from "next/server";
 
-// 🔹 Шалгалт эхлүүлэх
+// 🔸 нийтлэг дүн бичих жижиг (одоо ухаантай) функц
+async function saveResultAndCleanup(args: {
+  name: string;
+  className: string;
+  code: string;
+  problems: Array<{ id: string; title: string; score: number; maxScore: number }>;
+  startTime?: string | null;
+  endTime?: string | null;
+  duration?: number | null;
+}) {
+  const { name, className, code, problems, startTime, endTime, duration } = args;
+
+  // 1. сервер дээр явцын дундах оноо байгаа эсэхийг шалгана
+  const examRef = adminFirestore.collection("santexam").doc(code);
+  const examSnap = await examRef.get();
+
+  // santexam дээр байсан бодлогууд
+  const serverProblems: Array<{ id: string; title: string; score: number; maxScore: number }> =
+    examSnap.exists && Array.isArray(examSnap.data()?.problems)
+      ? (examSnap.data()!.problems as any[]).map((p, i) => ({
+          id: typeof p.id === "string" ? p.id : `p${i + 1}`,
+          title: typeof p.title === "string" ? p.title : "",
+          score: typeof p.score === "number" ? p.score : 0,
+          maxScore: typeof p.maxScore === "number" ? p.maxScore : 0,
+        }))
+      : [];
+
+  // клиентээс ирсэн бодлогуудыг sanitize хийнэ
+  const clientProblems = (problems ?? []).map((p, i) => ({
+    id: typeof p.id === "string" ? p.id : `p${i + 1}`,
+    title: typeof p.title === "string" ? p.title : "",
+    score: typeof p.score === "number" ? p.score : 0,
+    maxScore: typeof p.maxScore === "number" ? p.maxScore : 0,
+  }));
+
+  // 2. merge хийх — id-гаар
+  const byId = new Map<string, { id: string; title: string; score: number; maxScore: number }>();
+
+  // эхлээд серверийнхийг хийнэ
+  for (const sp of serverProblems) {
+    byId.set(sp.id, sp);
+  }
+
+  // дараа нь клиентээс ирснийг давхарлана
+  for (const cp of clientProblems) {
+    const prev = byId.get(cp.id);
+    if (!prev) {
+      byId.set(cp.id, cp);
+    } else {
+      byId.set(cp.id, {
+        id: cp.id,
+        title: cp.title || prev.title,
+        // аль ихийг нь авдаг стратеги — ингэснээр сүүлд PATCH-ээр ирсэн өндөр оноо алга болохгүй
+        score: Math.max(cp.score, prev.score),
+        maxScore: Math.max(cp.maxScore, prev.maxScore),
+      });
+    }
+  }
+
+  const mergedProblems = Array.from(byId.values());
+
+  // 3. нийт оноо
+  const safeTotal = mergedProblems.reduce((s, p) => s + (p.score || 0), 0);
+
+  // 4. santexam-ыг цэвэрлэнэ
+  await examRef.delete().catch(() => {});
+
+  // 5. santresult дээр бичнэ
+  const resultRef = adminFirestore.collection("santresult").doc(code);
+  await resultRef.set({
+    name,
+    class: className,
+    code,
+    totalScore: safeTotal,
+    problems: mergedProblems,
+    startTime: startTime || examSnap.data()?.startTime || null,
+    endTime: endTime || new Date().toISOString(),
+    duration: typeof duration === "number" ? duration : null,
+    finishedAt: new Date().toISOString(),
+  });
+}
+
+// 🔹 Шалгалт эхлүүлэх ЭСВЭЛ (sendBeacon-аар) дуусгах
 export async function POST(req: Request) {
   try {
-    const { name, className, code } = await req.json();
+    const body = await req.json();
+
+    const name = body?.name as string | undefined;
+    const className = body?.className as string | undefined;
+    const code = body?.code as string | undefined;
 
     if (!name || !className || !code) {
       return NextResponse.json(
@@ -14,27 +100,72 @@ export async function POST(req: Request) {
       );
     }
 
-    const examRef = adminFirestore.collection("santexam").doc(code);
-    const examSnap = await examRef.get();
+    // 🚩 POST дээр problems ирсэн бол → энэ бол дуусгах
+    if (Array.isArray(body.problems)) {
+      const rawProblems = body.problems as Array<{
+        id?: unknown;
+        title?: unknown;
+        score?: unknown;
+        maxScore?: unknown;
+      }>;
+      const safeProblems = rawProblems.map((p, idx) => ({
+        id: typeof p.id === "string" ? p.id : `p${idx + 1}`,
+        title: typeof p.title === "string" ? p.title : "",
+        score: typeof p.score === "number" ? p.score : 0,
+        maxScore: typeof p.maxScore === "number" ? p.maxScore : 0,
+      }));
 
-    if (examSnap.exists) {
+      await saveResultAndCleanup({
+        name,
+        className,
+        code,
+        problems: safeProblems,
+        startTime: body.startTime ?? null,
+        endTime: body.endTime ?? null,
+        duration: body.duration ?? null,
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // 👇 энэ бол “шинэ шалгалт эхэлж байна”
+
+    // 1) урд нь дуусгасан бол
+    const resultRef = adminFirestore.collection("santresult").doc(code);
+    const resultSnap = await resultRef.get();
+    if (resultSnap.exists) {
       return NextResponse.json(
-        { ok: false, message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломжгүй." },
+        {
+          ok: false,
+          message: "Шалгалтаа өгөөд дууссан байна. Дахин өгөх боломжгүй.",
+        },
         { status: 409 }
       );
     }
 
-    // ✅ Шалгалт эхэлж байгаа сурагчийн мэдээллийг түр хадгалах
+    // 2) одоо өгч байгаа эсэх
+    const examRef = adminFirestore.collection("santexam").doc(code);
+    const examSnap = await examRef.get();
+    if (examSnap.exists) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломжгүй.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // 3) шинээр үүсгэнэ
     await examRef.set({
       name,
       class: className,
       code,
-      startTime: new Date().toISOString(), // эхэлсэн цаг
-       // ⛳️ ЭНЭ 3 МӨР
+      startTime: new Date().toISOString(),
       totalScore: 0,
       problems: [],
       updatedAt: new Date().toISOString(),
-        });
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -46,23 +177,20 @@ export async function POST(req: Request) {
   }
 }
 
-// 🔹 Шалгалт дуусах (НИЙТ ОНООГ СЕРВЕР ДЭЭР ДАХИН ТООЦОЖ ХАДГАЛНА)
+// 🔹 Шалгалт дуусах — client-ийн энгийн PUT
 export async function PUT(req: Request) {
   try {
-    type IncomingProblem = { id?: unknown; title?: unknown; score?: unknown; maxScore?: unknown };
     const payload = await req.json() as {
       name?: string;
       className?: string;
       code?: string;
-      totalScore?: unknown; // клиентээс ирснийг үл тооно
-      problems?: unknown;
+      problems?: Array<{ id?: unknown; title?: unknown; score?: unknown; maxScore?: unknown }>;
       startTime?: string | null;
       endTime?: string | null;
       duration?: number | null;
     };
 
     const { name, className, code } = payload;
-
     if (!name || !className || !code) {
       return NextResponse.json(
         { ok: false, message: "Missing data" },
@@ -70,35 +198,22 @@ export async function PUT(req: Request) {
       );
     }
 
-    // 🧹 problems-ийг цэвэршүүлэх
-    const rawProblems: IncomingProblem[] = Array.isArray(payload.problems) ? (payload.problems as IncomingProblem[]) : [];
-    const safeProblems = rawProblems.map((p, idx) => {
-      const id = typeof p.id === "string" ? p.id : `p${idx + 1}`;
-      const title = typeof p.title === "string" ? p.title : "";
-      const score = typeof p.score === "number" ? p.score : 0;
-      const maxScore = typeof p.maxScore === "number" ? p.maxScore : 0;
-      return { id, title, score, maxScore };
-    });
+    const rawProblems = Array.isArray(payload.problems) ? payload.problems : [];
+    const safeProblems = rawProblems.map((p, idx) => ({
+      id: typeof p.id === "string" ? p.id : `p${idx + 1}`,
+      title: typeof p.title === "string" ? p.title : "",
+      score: typeof p.score === "number" ? p.score : 0,
+      maxScore: typeof p.maxScore === "number" ? p.maxScore : 0,
+    }));
 
-    // 🧮 Нийт оноог сервер дээрээ дахин тооцох
-    const safeTotal = safeProblems.reduce((sum, p) => sum + p.score, 0);
-
-    // ✅ Хэрвээ шалгалт өгч байгаа бол устгана
-    const examRef = adminFirestore.collection("santexam").doc(code);
-    await examRef.delete();
-
-    // ✅ Дүнг хадгална (клиентээс ирсэн totalScore-г бус, серверийн бодсоныг бичнэ)
-    const resultRef = adminFirestore.collection("santresult").doc(code);
-    await resultRef.set({
+    await saveResultAndCleanup({
       name,
-      class: className,
+      className,
       code,
-      totalScore: safeTotal,
       problems: safeProblems,
-      startTime: payload.startTime || null,                      // эхэлсэн цаг
-      endTime: payload.endTime || new Date().toISOString(),      // дууссан цаг
-      duration: typeof payload.duration === "number" ? payload.duration : null, // үргэлжилсэн хугацаа (сек)
-      finishedAt: new Date().toISOString(),                      // сервер дээр дууссан цаг
+      startTime: payload.startTime ?? null,
+      endTime: payload.endTime ?? null,
+      duration: payload.duration ?? null,
     });
 
     return NextResponse.json({ ok: true });
@@ -111,7 +226,7 @@ export async function PUT(req: Request) {
   }
 }
 
-// 🔹 Шалгалтын статус шалгах
+// 🔹 Статус шалгах
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -124,7 +239,7 @@ export async function GET(req: Request) {
       );
     }
 
-    // ✅ Хэрвээ өмнө шалгалт өгсөн бол
+    // эхлээд дууссан эсэх
     const resultRef = adminFirestore.collection("santresult").doc(code);
     const resultSnap = await resultRef.get();
     if (resultSnap.exists) {
@@ -134,7 +249,7 @@ export async function GET(req: Request) {
       });
     }
 
-    // ✅ Хэрвээ одоо шалгалт өгч байгаа бол
+    // дараа нь өгч байгаа эсэх
     const examRef = adminFirestore.collection("santexam").doc(code);
     const examSnap = await examRef.get();
     if (examSnap.exists) {
@@ -144,7 +259,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // ✅ Шинээр шалгалт өгөх боломжтой
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("🔥 GET /api/sant/exam error:", e);
@@ -154,34 +268,34 @@ export async function GET(req: Request) {
     );
   }
 }
-// ... файл доторхи POST, PUT, GET функцуудын хажууд энэ PATCH-ийг нэмж өгнө
 
+// 🔹 Шалгалтын явцад түр хадгалах
 export async function PATCH(req: Request) {
   try {
-    type IncomingProblem = { id?: unknown; title?: unknown; score?: unknown; maxScore?: unknown };
     const body = await req.json() as {
       code?: string;
-      problems?: IncomingProblem[];
+      problems?: Array<{ id?: unknown; title?: unknown; score?: unknown; maxScore?: unknown }>;
     };
 
     const code = typeof body.code === "string" ? body.code : "";
-    const rawProblems: IncomingProblem[] = Array.isArray(body.problems) ? body.problems : [];
+    const rawProblems = Array.isArray(body.problems) ? body.problems : [];
+
     if (!code || rawProblems.length === 0) {
-      return NextResponse.json({ ok: false, message: "Missing or invalid data" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: "Missing or invalid data" },
+        { status: 400 }
+      );
     }
 
-    // 🔒 sanitize
     const safeProblems = rawProblems.map((p, i) => ({
-      id: typeof p.id === "string" ? p.id : `p${i+1}`,
+      id: typeof p.id === "string" ? p.id : `p${i + 1}`,
       title: typeof p.title === "string" ? p.title : "",
       score: typeof p.score === "number" ? p.score : 0,
       maxScore: typeof p.maxScore === "number" ? p.maxScore : 0,
     }));
 
-    // 🧮 нийт оноо
     const totalScore = safeProblems.reduce((s, p) => s + p.score, 0);
 
-    // ✍️ santexam дээр real-time update (Teacher самбар дээр шууд харагдана)
     const examRef = adminFirestore.collection("santexam").doc(code);
     await examRef.set(
       {
@@ -189,12 +303,15 @@ export async function PATCH(req: Request) {
         totalScore,
         updatedAt: new Date().toISOString(),
       },
-      { merge: true } // зөвхөн эдгээр талбарыг merge хийх
+      { merge: true }
     );
 
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("🔥 PATCH /api/sant/exam error:", e);
-    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Internal error" },
+      { status: 500 }
+    );
   }
 }
