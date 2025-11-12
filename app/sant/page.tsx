@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +57,156 @@ export default function SantPage() {
   const beforeUnloadHandlerRef = useRef<((e: BeforeUnloadEvent) => void) | null>(null);
   const isEndedRef = useRef(false);
 
+  // === ШИНЭ: Зөрчлийн удирдлагын state ===
+  const [violationCount, setViolationCount] = useState(0);
+  const [isWarningActive, setIsWarningActive] = useState(false);
+  const [warningTimeLeft, setWarningTimeLeft] = useState(0);
+  const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const violationInProgressRef = useRef(false); // Нэгэн зэрэг олон зөрчил дуудагдахаас сэргийлнэ
+
+  // === ШИНЭ: Анхааруулгын таймер цэвэрлэх функц ===
+  const clearWarningTimer = useCallback(() => {
+    if (warningTimerRef.current) {
+      clearInterval(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+  }, []);
+
+  // === `endExam` функцийг `useEffect`-үүдээс өмнө тодорхойлж, `useCallback`-аар ороов. ===
+  const endExam = useCallback(async () => {
+    if (isEndedRef.current) return;
+    isEndedRef.current = true;
+    if (!showSummary) setShowSummary(true);
+
+    // Бүх таймеруудыг зогсооно
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (beforeUnloadHandlerRef.current) {
+      window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
+      beforeUnloadHandlerRef.current = null;
+    }
+    clearWarningTimer(); // Зөрчлийн таймерыг мөн цэвэрлэнэ
+
+    // Дахин нэвтрэх алдааг засах
+    sessionStorage.removeItem('sant_student');
+
+    const endTime = new Date().toISOString();
+    const duration =
+      startTime ? Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) : null;
+
+    // Оноо алдагдах алдааны засвар (problems, totalScore-г хассан)
+    const finalPayload = {
+      name: current?.name,
+      className: current?.class,
+      code: current?.code,
+      startTime,
+      endTime,
+      duration,
+    };
+
+    const json = JSON.stringify(finalPayload);
+
+    // sendBeacon / fetch
+    let sent = false;
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([json], { type: 'application/json' });
+      sent = navigator.sendBeacon('/api/sant/exam', blob);
+    }
+    if (!sent) {
+      try {
+        await fetch('/api/sant/exam', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: json,
+          keepalive: true,
+        });
+      } catch {
+        toast.error('Дүн илгээхэд алдаа гарлаа.');
+      }
+    }
+
+    // fullscreen-с гаргана
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setShowSummary(true);
+    }
+  }, [
+    startTime,
+    current,
+    showSummary,
+    setShowSummary,
+    clearWarningTimer,
+    // endExam-г тогтвортой байлгахын тулд scores, problems-г хамаарлаас хассан.
+    // Эцсийн дүнг сервер тооцох тул эдгээр нь энд шаардлагагүй.
+  ]);
+
+  // === ШИНЭ: Дүрэм зөрчлийн нэгдсэн удирдлага ===
+  const handleViolation = useCallback(() => {
+    if (!examStarted || isEndedRef.current || violationInProgressRef.current) {
+      return;
+    }
+    violationInProgressRef.current = true;
+
+    const newViolationCount = violationCount + 1;
+    setViolationCount(newViolationCount);
+
+    let graceTime = 0;
+    if (newViolationCount === 1) graceTime = 10;
+    if (newViolationCount === 2) graceTime = 5;
+
+    if (graceTime > 0) {
+      // 1, 2-р зөрчил: Анхааруулга, тоолуур
+      toast.warning(`⚠️ Шалгалтын дүрмийг зөрчлөө! (${newViolationCount}-р удаа)`);
+      setWarningTimeLeft(graceTime);
+      setIsWarningActive(true);
+
+      clearWarningTimer();
+      warningTimerRef.current = setInterval(() => {
+        setWarningTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearWarningTimer();
+            toast.error(`Хугацаа дууссан тул шалгалт дууслаа.`);
+            setIsWarningActive(false);
+            violationInProgressRef.current = false;
+            endExam(); // Хугацаа дуусахад шалгалтыг дуусгана
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      // 3-р зөрчил: Шууд дуусгана
+      toast.error(`Дүрэм 3 удаа зөрчсөн тул шалгалт дууслаа.`);
+      violationInProgressRef.current = false;
+      endExam();
+    }
+  }, [examStarted, violationCount, endExam, clearWarningTimer]);
+
+  // === ШИНЭ: Шалгалт руу буцах товчны үйлдэл ===
+  const handleReturnToExam = useCallback(async () => {
+    clearWarningTimer();
+    setIsWarningActive(false);
+    violationInProgressRef.current = false;
+    toast.success('Шалгалт үргэлжиллээ.');
+
+    // Fullscreen-д буцааж оруулахыг оролдоно
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen && !document.fullscreenElement) {
+        await el.requestFullscreen();
+      }
+      // Фокусыг буцааж авчрах (blur-с сэргийлэх)
+      window.focus();
+    } catch {}
+  }, [clearWarningTimer]);
+
   // === Fetch students ===
   useEffect(() => {
     (async () => {
@@ -72,13 +222,15 @@ export default function SantPage() {
       }
     })();
 
+    // `useEffect` цэвэрлэгч функц
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (beforeUnloadHandlerRef.current) {
         window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
       }
+      clearWarningTimer(); // ШИНЭ: Анхааруулгын таймерыг цэвэрлэнэ
     };
-  }, []);
+  }, [clearWarningTimer]); // `clearWarningTimer` нь `useCallback` тул тогтвортой
 
   const grades = useMemo(() => {
     const set = new Set<string>();
@@ -134,23 +286,19 @@ export default function SantPage() {
     }
   }, []);
 
-  // === Fullscreen guard ===
+  // === Fullscreen guard (ШИНЭЧЛЭГДСЭН) ===
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isFullscreen = document.fullscreenElement;
-      if (!isFullscreen && examStarted && !isEndedRef.current) {
-        toast.error('Fullscreen-ээс гарсан тул шалгалт дууслаа.');
-        setExamStarted(false);
-        endExam();
-        // Энд sessionStorage.removeItem-г хийх шаардлагагүй,
-        // Учир нь endExam() функц өөрөө үүнийг хийх болно.
+      // Fullscreen-с гарсан, шалгалт эхэлсэн, дуусаагүй үед
+      if (!document.fullscreenElement && examStarted && !isEndedRef.current) {
+        handleViolation();
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [examStarted]); // `endExam` хамаарлаас хасав.
+  }, [examStarted, handleViolation]);
 
-  // === Copy/Paste/Contextmenu-г шалгалтын үед хориглох
+  // === Copy/Paste/Contextmenu (ХЭВЭЭРЭЭ) ===
   useEffect(() => {
     if (!examStarted) return;
 
@@ -178,21 +326,21 @@ export default function SantPage() {
     };
   }, [examStarted]);
 
-  // === Tab солих, цонх идэвхгүй болох
+  // === Tab солих, цонх идэвхгүй болох (ШИНЭЧЛЭГДСЭН) ===
   useEffect(() => {
     if (!examStarted) return;
 
     const handleHidden = () => {
       if (document.hidden && !isEndedRef.current) {
-        toast.error('⚠️ Та өөр tab руу шилжлээ. Шалгалт дууслаа.');
-        endExam();
+        handleViolation();
       }
     };
 
     const handleBlur = () => {
-      if (!isEndedRef.current) {
-        toast.error('⚠️ Цонх идэвхгүй боллоо. Шалгалт дууслаа.');
-        endExam();
+      // Анхааруулга идэвхтэй үед blur-г тооцохгүй
+      // (жишээ нь, хэрэглэгч буцах товч дарахын тулд хөдлөхөд)
+      if (!isEndedRef.current && !violationInProgressRef.current) {
+        handleViolation();
       }
     };
 
@@ -203,26 +351,34 @@ export default function SantPage() {
       document.removeEventListener('visibilitychange', handleHidden);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [examStarted]); // `endExam` хамаарлаас хасав.
+  }, [examStarted, handleViolation]);
 
-  // === Интернет тасрах
+  // === Интернет тасрах (ШИНЭЧЛЭГДСЭН) ===
   useEffect(() => {
     const handleOffline = () => {
       toast.error('⚠️ Интернет тасарлаа. Шалгалт автоматаар дуусаж байна.');
+      // Энэ нь зөрчил биш, шууд дуусгах үйлдэл тул `handleViolation`-г дуудахгүй
       endExam();
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
-  }, []); // `endExam` хамаарлаас хасав.
+  }, [endExam]);
 
+  // === startExam (ХЭВЭЭРЭЭ) ===
   const startExam = async () => {
+    // Шалгалт эхлэхэд зөрчлийн тоог 0-лөнө
+    setViolationCount(0);
+    setIsWarningActive(false);
+    clearWarningTimer();
+    violationInProgressRef.current = false;
+    isEndedRef.current = false;
+
     const el = document.documentElement;
     try {
       if (el.requestFullscreen) await el.requestFullscreen();
     } catch {}
 
     setExamStarted(true);
-    isEndedRef.current = false;
     toast.success('Шалгалт эхэллээ!');
     setStartTime(new Date().toISOString());
 
@@ -278,7 +434,7 @@ export default function SantPage() {
     }
 
     // 40 минутын таймер
-    setTimeLeft(2400);
+    setTimeLeft(2400); // 40 минут
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -312,90 +468,15 @@ export default function SantPage() {
     window.addEventListener('beforeunload', beforeUnloadHandlerRef.current);
   };
 
-  const endExam = async () => {
-    if (isEndedRef.current) return;
-    isEndedRef.current = true;
-    if (!showSummary) setShowSummary(true);
-
-    // таймер зогсооно
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (beforeUnloadHandlerRef.current) {
-      window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
-      beforeUnloadHandlerRef.current = null;
-    }
-
-    // 👇 *** ЭНД ЗАСВАР НЭМЭГДСЭН ***
-    // Шалгалт дууссан тул сессийг цэвэрлэснээр
-    // хуудсыг refresh хийхэд дахин нэвтрэх боломжийг хаана.
-    sessionStorage.removeItem('sant_student');
-    // 👆 *** /ЗАСВАР ДУУСАВ ***
-
-    const endTime = new Date().toISOString();
-    const duration =
-      startTime ? Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) : null;
-
-    // сервер рүү явуулах payload-ийг нэг л удаа хийж авна
-    const finalPayload = {
-      name: current?.name,
-      className: current?.class,
-      code: current?.code,
-      totalScore: Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
-      problems: problems.map((p) => ({
-        id: p.id,
-        title: p.title,
-        score: scores[p.id] ?? 0,
-        maxScore: p.maxScore,
-      })),
-      startTime,
-      endTime,
-      duration,
-    };
-
-    const json = JSON.stringify(finalPayload);
-
-    // 1) sendBeacon-р оролдоно
-    let sent = false;
-    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-      const blob = new Blob([json], { type: 'application/json' });
-      sent = navigator.sendBeacon('/api/sant/exam', blob);
-    }
-
-    // 2) хэрвээ beacon болоогүй бол fetch keepalive
-    if (!sent) {
-      try {
-        await fetch('/api/sant/exam', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: json,
-          keepalive: true,
-        });
-      } catch {
-        toast.error('Дүн илгээхэд алдаа гарлаа.');
-      }
-    }
-
-    // fullscreen-с гаргана
-    try {
-      if (document.fullscreenElement && document.exitFullscreen) {
-        await document.exitFullscreen();
-      }
-    } catch {
-      // ignore
-    } finally {
-      setShowSummary(true);
-    }
-  };
-
+  // === totalScore (ХЭВЭЭРЭЭ) ===
   const totalScore = useMemo(
     () => Object.values(scores).reduce((a, b) => a + (b ?? 0), 0),
     [scores]
   );
   const totalMaxScore = useMemo(() => problems.reduce((sum, p) => sum + p.maxScore, 0), [problems]);
 
-  const runLocalJudge = async (problemId: string) => {
+  // === runLocalJudge (useCallback-аар ороосон) ===
+  const runLocalJudge = useCallback(async (problemId: string) => {
     const p = problems.find((x) => x.id === problemId);
     if (!p) return;
     const userCode = (solutions[problemId] ?? '').trim();
@@ -428,16 +509,26 @@ result
           passedList.push(i + 1);
           details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
         } else {
-          // алга, шалгалт дээр унагасан тестийг detail-д хиймээр байвал энд хийж болно
+          // унасан тестийг харуулах
         }
       } catch {
-        // алдаатай тестийг зүгээр алгасна
+        // алдаатай тестийг алгасах
       }
     }
 
     const total = p.tests.length;
     const score = Math.round((passed / total) * p.maxScore);
-    setScores((prev) => ({ ...prev, [problemId]: score }));
+    
+    // Race condition-с сэргийлж, state-г шинэчлэхээс өмнө payload-оо бэлдэнэ
+    const nextScores = { ...scores, [problemId]: score };
+    const payloadProblems = problems.map((pb) => ({
+      id: pb.id,
+      title: pb.title,
+      score: nextScores[pb.id] ?? 0,
+      maxScore: pb.maxScore,
+    }));
+
+    setScores(nextScores);
     setResults((prev) => ({
       ...prev,
       [problemId]: { passed, total, passedList, details },
@@ -447,28 +538,21 @@ result
 
     // оноо түр хадгалах
     try {
-      const nextScores = { ...scores, [problemId]: score };
-      const payloadProblems = problems.map((pb) => ({
-        id: pb.id,
-        title: pb.title,
-        score: nextScores[pb.id] ?? 0,
-        maxScore: pb.maxScore,
-      }));
-
       await fetch('/api/sant/exam', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: current!.code,
-          problems: payloadProblems,
+          problems: payloadProblems, // Шинэ оноог ашиглана
         }),
       });
     } catch {
       toast.error('Түр хадгалах үед алдаа гарлаа.');
     }
-  };
+  }, [problems, solutions, pyodide, scores, current]);
 
-  const scoreClass = (problemId: string) => {
+  // === scoreClass (useCallback-аар ороосон) ===
+  const scoreClass = useCallback((problemId: string) => {
     const p = problems.find((x) => x.id === problemId);
     if (!p) return '';
     const sc = scores[problemId] ?? 0;
@@ -476,9 +560,39 @@ result
     if (ratio === 1) return 'text-green-600';
     if (ratio >= 0.4) return 'text-yellow-600';
     return 'text-red-600';
-  };
+  }, [problems, scores]);
 
-  // === Онооны цонх ===
+  // === ШИНЭ: Анхааруулгын UI ===
+  if (isWarningActive) {
+    return (
+      <main className="flex flex-col items-center justify-center min-h-screen p-4 bg-red-900 text-white fixed inset-0 z-[9999]">
+        <Card className="max-w-lg w-full bg-white text-black">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl text-red-600">⚠️ АНХААРУУЛГА!</CardTitle>
+            <CardDescription className="text-lg text-gray-700">
+              Та шалгалтын дэлгэцээс гарлаа! ({violationCount}-р зөрчил)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-center text-7xl font-bold text-red-600">
+              {warningTimeLeft}
+            </p>
+            <p className="text-center text-gray-600">
+              Дээрх хугацаа дуусахаас өмнө шалгалт руу буцаж орно уу. Эс бөгөөс таны шалгалт автоматаар дуусах болно.
+            </p>
+            <Button
+              className="w-full text-lg py-6"
+              onClick={handleReturnToExam}
+            >
+              Шалгалт руу буцах
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  // === Онооны цонх (ХЭВЭЭРЭЭ) ===
   if (showSummary)
     return (
       <main className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
@@ -523,8 +637,6 @@ result
                 setShowSummary(false);
                 setExamStarted(false);
                 setCurrent(null);
-                // Энд sessionStorage.removeItem хийх нь зөв,
-                // гэхдээ endExam дотор хийснээр refresh хийх үеийг давхар хамгаалж байгаа.
                 sessionStorage.removeItem('sant_student');
               }}
             >
@@ -535,7 +647,7 @@ result
       </main>
     );
 
-  // === 1. Шалгалт эхлээгүй боловч нэвтэрсэн ===
+  // === 1. Шалгалт эхлээгүй боловч нэвтэрсэн (ХЭВЭЭРЭЭ) ===
   if (current && !examStarted)
     return (
       <main className="container mx-auto p-4 max-w-2xl">
@@ -573,7 +685,7 @@ result
       </main>
     );
 
-  // === 2. Шалгалт эхэлсэн ===
+  // === 2. Шалгалт эхэлсэн (ХЭВЭЭРЭЭ) ===
   if (current && examStarted)
     return (
       <Exam
@@ -596,7 +708,7 @@ result
       />
     );
 
-  // === 3. Нэвтрээгүй ===
+  // === 3. Нэвтрээгүй (ХЭВЭЭРЭЭ) ===
   if (loading) return <div className="p-6">Ачаалж байна...</div>;
 
   return (
