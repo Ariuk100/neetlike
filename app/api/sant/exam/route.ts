@@ -21,7 +21,12 @@ async function saveResultAndCleanup(args: {
   // santexam дээр байсан бодлогууд
   const serverProblems: Array<{ id: string; title: string; score: number; maxScore: number }> =
     examSnap.exists && Array.isArray(examSnap.data()?.problems)
-      ? (examSnap.data()!.problems as any[]).map((p, i) => ({
+      ? (examSnap.data()!.problems as Array<{ // <--- ЗАСВАР
+          id?: unknown;
+          title?: unknown;
+          score?: unknown;
+          maxScore?: unknown;
+        }>).map((p, i) => ({ // <--- ЗАСВАР
           id: typeof p.id === "string" ? p.id : `p${i + 1}`,
           title: typeof p.title === "string" ? p.title : "",
           score: typeof p.score === "number" ? p.score : 0,
@@ -137,7 +142,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          message: "Шалгалтаа өгөөд дууссан байна. Дахин өгөх боломжгүй.",
+          message: "Шалгалтаа өгөөд дууссан байна. Дахин өгөх боломгүй.",
         },
         { status: 409 }
       );
@@ -150,7 +155,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломжгүй.",
+          message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломгүй.",
         },
         { status: 409 }
       );
@@ -245,7 +250,7 @@ export async function GET(req: Request) {
     if (resultSnap.exists) {
       return NextResponse.json({
         ok: false,
-        message: "Шалгалтаа өгөөд дууссан байна. Дахин өгөх боломжгүй.",
+        message: "Шалгалтаа өгөөд дууссан байна. Дахин өгөх боломгүй.",
       });
     }
 
@@ -255,7 +260,7 @@ export async function GET(req: Request) {
     if (examSnap.exists) {
       return NextResponse.json({
         ok: false,
-        message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломжгүй.",
+        message: "Шалгалт өгч байна. Өөр компьютэрээс дахин өгөх боломгүй.",
       });
     }
 

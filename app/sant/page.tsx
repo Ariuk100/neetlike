@@ -142,12 +142,13 @@ export default function SantPage() {
         toast.error('Fullscreen-ээс гарсан тул шалгалт дууслаа.');
         setExamStarted(false);
         endExam();
-        sessionStorage.removeItem('sant_student');
+        // Энд sessionStorage.removeItem-г хийх шаардлагагүй,
+        // Учир нь endExam() функц өөрөө үүнийг хийх болно.
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [examStarted]);
+  }, [examStarted]); // `endExam` хамаарлаас хасав.
 
   // === Copy/Paste/Contextmenu-г шалгалтын үед хориглох
   useEffect(() => {
@@ -202,7 +203,7 @@ export default function SantPage() {
       document.removeEventListener('visibilitychange', handleHidden);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [examStarted]);
+  }, [examStarted]); // `endExam` хамаарлаас хасав.
 
   // === Интернет тасрах
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function SantPage() {
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
-  }, []);
+  }, []); // `endExam` хамаарлаас хасав.
 
   const startExam = async () => {
     const el = document.documentElement;
@@ -325,6 +326,12 @@ export default function SantPage() {
       window.removeEventListener('beforeunload', beforeUnloadHandlerRef.current);
       beforeUnloadHandlerRef.current = null;
     }
+
+    // 👇 *** ЭНД ЗАСВАР НЭМЭГДСЭН ***
+    // Шалгалт дууссан тул сессийг цэвэрлэснээр
+    // хуудсыг refresh хийхэд дахин нэвтрэх боломжийг хаана.
+    sessionStorage.removeItem('sant_student');
+    // 👆 *** /ЗАСВАР ДУУСАВ ***
 
     const endTime = new Date().toISOString();
     const duration =
@@ -516,6 +523,8 @@ result
                 setShowSummary(false);
                 setExamStarted(false);
                 setCurrent(null);
+                // Энд sessionStorage.removeItem хийх нь зөв,
+                // гэхдээ endExam дотор хийснээр refresh хийх үеийг давхар хамгаалж байгаа.
                 sessionStorage.removeItem('sant_student');
               }}
             >
