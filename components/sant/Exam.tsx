@@ -20,7 +20,6 @@ type RunResult = {
   details: Array<{ index: number; input: string; expected: string; actual: string }>;
 };
 type Student = { class: string; code: string; name: string };
-type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
 
 interface ExamProps {
   current: Student;
@@ -34,10 +33,8 @@ interface ExamProps {
   solutions: Record<string, string>;
   setSolutions: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   runLocalJudge: (id: string) => void;
-  pyodide: Pyodide | null;
   running: Record<string, boolean>;
   scores: Record<string, number>;
-  scoreClass: (id: string) => string;
   endExam: () => void;
 }
 
@@ -53,10 +50,8 @@ export default function Exam({
   solutions,
   setSolutions,
   runLocalJudge,
-  pyodide, // одоохондоо ашиглахгүй
   running,
   scores,
-  scoreClass,
   endExam,
 }: ExamProps) {
   return (

@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "09e2947bfcee4019a38b1b41cf1e353e.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "pub-09e2947bfcee4019a38b1b41cf1e353e.r2.dev" },
       { protocol: "https", hostname: "placehold.co" },
+      // Firebase Storage
+      { protocol: "https", hostname: "firebasestorage.googleapis.com" },
     ],
   },
   async headers() {

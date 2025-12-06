@@ -28,6 +28,18 @@ service cloud.firestore {
       allow update: if false; // Update хийхийг хориглоно
     }
     
+    // "whiteboard_sessions" collection-ийн дүрэм
+    // Түр хугацаанд бүх хүнд нээлттэй байлгана (Login шаардахгүйгээр сурагчид нэвтэрч байгаа тул)
+    match /whiteboard_sessions/{sessionId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // "active_sessions" collection-ийн дүрэм
+    // Багш нар идэвхтэй хичээлээ энд бичиж, сурагчид уншдаг.
+    match /active_sessions/{teacherId} {
+      allow read, write: if true;
+    }
+
     // Бусад бүх collection-д хандахыг хориглоно (аюулгүй байдлын үүднээс)
     match /{document=**} {
       allow read, write: if false;
