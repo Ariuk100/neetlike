@@ -81,7 +81,7 @@ export default function TeacherLoginPage() {
             <Card className="w-full max-w-sm">
                 <CardHeader className="text-center">
                     <div className="mx-auto w-16 h-16 mb-4">
-                        <Image src="/sant-logo.png" alt="Logo" width={64} height={64} className="w-full h-full object-contain" />
+                        <Image src="/sant-watermark-white.png" alt="Logo" width={64} height={64} className="w-full h-full object-contain" />
                     </div>
                     <CardTitle className="text-2xl">Багшийн нэвтрэх хэсэг</CardTitle>
                 </CardHeader>

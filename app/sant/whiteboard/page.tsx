@@ -12,6 +12,14 @@ import WhiteboardCanvas from '@/components/sant/WhiteboardCanvas';
 import { Copy, LogOut } from 'lucide-react';
 import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import {
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import EndSessionDialog from '@/components/sant/EndSessionDialog';
 
 interface WhiteboardData {
     classes: string[];
@@ -33,6 +41,8 @@ function WhiteboardContent() {
     const [isAllowedToWrite, setIsAllowedToWrite] = useState(true); // Default to true
     const [currentPage, setCurrentPage] = useState(0);   // NEW: Multi-page
     const [totalPages, setTotalPages] = useState(1);     // NEW: Multi-page
+    const [endDialogOpen, setEndDialogOpen] = useState(false);
+    const [endingLoading, setEndingLoading] = useState(false);
 
     // Fetch initial data
     useEffect(() => {
@@ -240,20 +250,37 @@ function WhiteboardContent() {
         router.push('/sant/whiteboard');
     };
 
-    const endSession = async () => {
-        if (!confirm('Хичээлийг дуусгах уу? Энэ үйлдлээр самбар дээрх бүх дата устах болно.')) return;
+    const endSession = async (action: 'save' | 'delete') => {
+        if (!sessionId) return;
+        setEndingLoading(true);
+
         try {
-            if (sessionId) {
+            if (action === 'delete') {
+                // Hard delete
                 await fetch('/api/sant/whiteboard/cleanup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionId }),
                 });
+                toast.success('Хичээл устгагдлаа');
+            } else {
+                // Save (Archive)
+                // Just mark as inactive so students get kicked, but data remains
+                await updateDoc(doc(db, 'whiteboard_sessions', sessionId), {
+                    isActive: false,
+                    archivedAt: new Date().toISOString(),
+                    // Optionally ask for a name? For now just save as is.
+                });
+                toast.success('Хичээл хадгалагдлаа');
             }
-            toast.success('Хичээл дууслаа');
+
             router.push('/sant/whiteboard');
-        } catch {
+        } catch (e) {
+            console.error(e);
             toast.error('Алдаа гарлаа');
+        } finally {
+            setEndingLoading(false);
+            setEndDialogOpen(false);
         }
     };
 
@@ -281,6 +308,42 @@ function WhiteboardContent() {
             await updateDoc(doc(db, 'whiteboard_sessions', sessionId), {
                 currentPage: newPage
             });
+        }
+    };
+
+    const handleDeletePage = async () => {
+        if (!isTeacher || !sessionId) return;
+        if (totalPages <= 1) {
+            toast.error('Сүүлийн хуудсыг устгах боломжгүй');
+            return;
+        }
+
+        const toastId = toast.loading('Хуудсыг устгаж байна...');
+        try {
+            const res = await fetch('/api/sant/whiteboard/page/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, pageIndex: currentPage }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                toast.success('Хуудас устгагдлаа', { id: toastId });
+                // The totalPages will update via listener.
+                // If we were on the last page, we should navigate back.
+                // The listener for totalPages handles clamping?
+                // Let's force clamp if needed.
+                if (currentPage >= data.newTotal) {
+                    await updateDoc(doc(db, 'whiteboard_sessions', sessionId), {
+                        currentPage: Math.max(0, data.newTotal - 1)
+                    });
+                }
+            } else {
+                toast.error(data.error || 'Алдаа гарлаа', { id: toastId });
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error('Холболтын алдаа', { id: toastId });
         }
     };
 
@@ -318,7 +381,7 @@ function WhiteboardContent() {
                 <Card className="w-full max-w-md">
                     <CardHeader className="text-center">
                         <div className="mx-auto w-16 h-16 mb-4">
-                            <Image src="/sant-logo.png" width={64} height={64} alt="Logo" className="w-full h-full object-contain" />
+                            <Image src="/sant-watermark-white.png" width={64} height={64} alt="Logo" className="w-full h-full object-contain" />
                         </div>
                         <CardTitle className="text-2xl">Sant Whiteboard</CardTitle>
                     </CardHeader>
@@ -383,7 +446,7 @@ function WhiteboardContent() {
             {/* Header */}
             <header className="flex-none h-14 bg-white border-b flex items-center justify-between px-4 z-10">
                 <div className="flex items-center gap-2">
-                    <Image src="/sant-logo.png" width={32} height={32} className="object-contain" alt="Logo" />
+                    <Image src="/sant-watermark-white.png" width={32} height={32} className="object-contain" alt="Logo" />
                     <span className="font-semibold text-stone-700">Сант</span>
                     <span className="px-2 py-0.5 rounded bg-stone-100 text-xs font-mono text-stone-500 border border-stone-200">
                         {sessionId}
@@ -398,10 +461,18 @@ function WhiteboardContent() {
                         </Button>
                     )}
                     {isTeacher ? (
-                        <Button variant="destructive" size="sm" onClick={endSession}>
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Дуусгах
-                        </Button>
+                        <>
+                            <Button variant="destructive" size="sm" onClick={() => setEndDialogOpen(true)}>
+                                <LogOut className="w-4 h-4 mr-2" />
+                                Дуусгах
+                            </Button>
+                            <EndSessionDialog
+                                open={endDialogOpen}
+                                onOpenChange={setEndDialogOpen}
+                                onEnd={endSession}
+                                loading={endingLoading}
+                            />
+                        </>
                     ) : (
                         <Button variant="ghost" size="sm" onClick={handleStudentExit}>
                             Гарах
@@ -422,6 +493,7 @@ function WhiteboardContent() {
                         currentPage={currentPage}
                         totalPages={totalPages}
                         onAddPage={handleAddPage}
+                        onDeletePage={handleDeletePage}
                         onNavigatePage={handleNavigatePage}
                     />
                 </div>

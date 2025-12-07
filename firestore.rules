@@ -40,6 +40,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // "prepared_lessons" collection-ийн дүрэм
+    match /prepared_lessons/{lessonId}/{document=**} {
+      allow read, write: if true;
+    }
+
     // Бусад бүх collection-д хандахыг хориглоно (аюулгүй байдлын үүднээс)
     match /{document=**} {
       allow read, write: if false;

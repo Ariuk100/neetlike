@@ -33,13 +33,16 @@ export async function POST(req: Request) {
         await batch.commit();
 
         // NEW: Delete pages and their nested paths collections
-        // Firestore doesn't auto-delete nested collections, so we need to do it manually
-        const pagesSnapshot = await sessionRef.collection('pages').get();
+        // We fetching 'totalPages' to know how many pages to scan, because 'pages' docs might be phantom (non-existent parent)
+        const sessionDoc = await sessionRef.get();
+        const totalPages = sessionDoc.exists ? (sessionDoc.data()?.totalPages || 10) : 10; // Default to 10 if not found, just in case
 
-        for (const pageDoc of pagesSnapshot.docs) {
-            // Delete all paths in this page
-            const pathsSnapshot = await pageDoc.ref.collection('paths').get();
+        // Iterate known pages
+        for (let i = 0; i < totalPages; i++) {
+            const pageRef = sessionRef.collection('pages').doc(String(i));
 
+            // Delete 'paths' subcollection
+            const pathsSnapshot = await pageRef.collection('paths').get();
             if (pathsSnapshot.docs.length > 0) {
                 const pathBatch = adminFirestore.batch();
                 pathsSnapshot.docs.forEach((pathDoc) => {
@@ -48,9 +51,8 @@ export async function POST(req: Request) {
                 await pathBatch.commit();
             }
 
-            // NEW: Delete all elements (images/text/video) in this page
-            const elementsSnapshot = await pageDoc.ref.collection('elements').get();
-
+            // Delete 'elements' subcollection
+            const elementsSnapshot = await pageRef.collection('elements').get();
             if (elementsSnapshot.docs.length > 0) {
                 const elementBatch = adminFirestore.batch();
                 elementsSnapshot.docs.forEach((elementDoc) => {
@@ -59,8 +61,10 @@ export async function POST(req: Request) {
                 await elementBatch.commit();
             }
 
-            // Delete the page document itself
-            await pageDoc.ref.delete();
+            // Attempt to delete the page doc itself (if it exists)
+            // Note: In batch or individually. Since it might not exist, this is harmless.
+            // We use a small batch or just ignore await to speed up? safely await.
+            await pageRef.delete();
         }
 
         return NextResponse.json({ success: true, message: `Session ${sessionId} ended and cleaned up.` });

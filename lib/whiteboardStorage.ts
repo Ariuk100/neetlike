@@ -13,7 +13,9 @@ export async function uploadWhiteboardImage(
 ): Promise<string> {
     // Create unique filename
     const timestamp = Date.now();
-    const filename = `${timestamp}_${file.name}`;
+    // Sanitize filename: remove special characters, keep extension
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+    const filename = `${timestamp}_${sanitizedName}`;
     const storagePath = `whiteboard/${sessionId}/page_${pageIndex}/${filename}`;
 
     const storageRef = ref(storage, storagePath);
