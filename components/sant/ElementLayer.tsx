@@ -6,10 +6,11 @@ import { db } from '@/lib/firebase';
 import { X, Edit3, Play, MousePointer2 } from 'lucide-react';
 import TextFormatToolbar, { TextStyle } from './TextFormatToolbar';
 import InputDialog from './InputDialog';
+import PhotonRaceGame from './PhotonRaceGame';
 
 export interface WhiteboardElement {
     id: string;
-    type: 'image' | 'text' | 'video' | 'iframe';
+    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game';
     x: number;      // Percentage (0-100)
     y: number;      // Percentage (0-100)
     width: number;  // Percentage (0-100)
@@ -39,9 +40,10 @@ interface ElementLayerProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     selectedElement: string | null;
     onSelect: (id: string | null) => void;
+    userName: string;
 }
 
-export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllowedToWrite = false, containerRef, selectedElement, onSelect }: ElementLayerProps) {
+export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllowedToWrite = false, containerRef, selectedElement, onSelect, userName }: ElementLayerProps) {
     const [elements, setElements] = useState<WhiteboardElement[]>([]);
 
     // Interaction State
@@ -400,6 +402,22 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 {/* Overlay for dragging - only present when NOT interacting */}
                                 {!isInteracting && (
                                     <div className="absolute inset-0 bg-transparent z-10" />
+                                )}
+                            </div>
+                        )}
+
+                        {element.type === 'photon_game' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <PhotonRaceGame
+                                    isTeacher={isTeacher}
+                                    isAllowedDraw={isAllowedToWrite || isTeacher}
+                                    element={element}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                />
+                                {!isInteracting && (
+                                    <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
                                 )}
                             </div>
                         )}

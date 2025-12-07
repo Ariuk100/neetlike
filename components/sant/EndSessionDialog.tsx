@@ -5,8 +5,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogFooter,
-    AlertDialogCancel,
-    AlertDialogAction
+    AlertDialogCancel
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';

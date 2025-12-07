@@ -12,13 +12,6 @@ import WhiteboardCanvas from '@/components/sant/WhiteboardCanvas';
 import { Copy, LogOut } from 'lucide-react';
 import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import {
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import EndSessionDialog from '@/components/sant/EndSessionDialog';
 
 interface WhiteboardData {

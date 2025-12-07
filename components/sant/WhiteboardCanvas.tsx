@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Trash2, Eraser, Pen, Lock, Unlock, ChevronLeft, ChevronRight, Plus, ImageIcon, Type, Video, MousePointer, FolderOpen, FileUp, Globe, FileMinus, Target } from 'lucide-react';
+import { Trash2, Eraser, Pen, Lock, Unlock, ChevronLeft, ChevronRight, Plus, ImageIcon, Type, Video, MousePointer, FolderOpen, FileUp, Globe, FileMinus, Target, Trophy } from 'lucide-react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -528,6 +528,27 @@ export default function WhiteboardCanvas({
         }
     };
 
+    const createPhotonGameElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'photon_game',
+                x: 20,
+                y: 20,
+                width: 60,
+                height: 60,
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
+
+            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("Photon Race тоглоом нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating game:", error);
+            toast.error("Тоглоом нэмэхэд алдаа гарлаа");
+        }
+    };
+
     const createIframeElement = async (url: string) => {
         if (!url.trim()) return;
 
@@ -620,6 +641,24 @@ export default function WhiteboardCanvas({
 
 
                                     <div className="h-6 w-px bg-stone-200 mx-1" />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setIframeDialogOpen(true)}
+                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        title="Simulation / Embed нэмэх"
+                                    >
+                                        <Globe className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={createPhotonGameElement}
+                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        title="Photon Race Тоглоом нэмэх"
+                                    >
+                                        <Trophy className="w-4 h-4" />
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -756,6 +795,15 @@ export default function WhiteboardCanvas({
                                     >
                                         <Globe className="w-4 h-4" />
                                     </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={createPhotonGameElement}
+                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        title="Photon Race Тоглоом нэмэх"
+                                    >
+                                        <Trophy className="w-4 h-4" />
+                                    </Button>
                                 </div>
 
                                 <div className="h-6 w-px bg-stone-200 flex-shrink-0" />
@@ -874,8 +922,9 @@ export default function WhiteboardCanvas({
                                 </div>
                             </>
                         )}
-                    </div >
+                    </div>
                 )}
+
 
                 <div ref={containerRef} className="relative w-full aspect-video max-h-full bg-white rounded-lg shadow-lg overflow-hidden touch-none">
                     {/* Background Logo */}
@@ -890,10 +939,11 @@ export default function WhiteboardCanvas({
                         sessionId={sessionId}
                         currentPage={currentPage}
                         isTeacher={isTeacher}
-                        isAllowedToWrite={isAllowedToWrite} // Pass permission
+                        isAllowedToWrite={isAllowedToWrite || isTeacher}
                         containerRef={containerRef}
                         selectedElement={selectedElement}
                         onSelect={setSelectedElement}
+                        userName={userName || 'Guest'}
                     />
 
                     {/* Drawing Canvas - Z-index 50/Increased */}
@@ -988,10 +1038,10 @@ export default function WhiteboardCanvas({
                         </div>
                     )}
                 </div>
-            </div >
+            </div>
 
             {/* Input Dialogs */}
-            < InputDialog
+            <InputDialog
                 open={textDialogOpen}
                 onOpenChange={setTextDialogOpen}
                 title="Текст нэмэх"
