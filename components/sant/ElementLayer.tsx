@@ -7,10 +7,11 @@ import { X, Edit3, Play, MousePointer2 } from 'lucide-react';
 import TextFormatToolbar, { TextStyle } from './TextFormatToolbar';
 import InputDialog from './InputDialog';
 import PhotonRaceGame from './PhotonRaceGame';
+import QuizGame from './QuizGame';
 
 export interface WhiteboardElement {
     id: string;
-    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game';
+    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game';
     x: number;      // Percentage (0-100)
     y: number;      // Percentage (0-100)
     width: number;  // Percentage (0-100)
@@ -409,6 +410,22 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                         {element.type === 'photon_game' && (
                             <div className="w-full h-full relative pointer-events-auto">
                                 <PhotonRaceGame
+                                    isTeacher={isTeacher}
+                                    isAllowedDraw={isAllowedToWrite || isTeacher}
+                                    element={element}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                />
+                                {!isInteracting && (
+                                    <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
+                                )}
+                            </div>
+                        )}
+
+                        {element.type === 'quiz_game' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <QuizGame
                                     isTeacher={isTeacher}
                                     isAllowedDraw={isAllowedToWrite || isTeacher}
                                     element={element}
