@@ -336,7 +336,8 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                 return (
                     <div
                         key={element.id}
-                        className={`absolute touch-none select-none 
+                        className={`absolute 
+                            ${element.type !== 'quiz_game' ? 'touch-none select-none' : ''} 
                             ${getAnimationClass(element.animation)} 
                             ${isSelected ? 'ring-2 ring-blue-500' : ''}
                             ${isInteracting ? 'pointer-events-none z-50' : 'pointer-events-auto'}
@@ -433,9 +434,6 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     currentPage={currentPage}
                                     userName={userName}
                                 />
-                                {!isInteracting && (
-                                    <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
-                                )}
                             </div>
                         )}
 
