@@ -581,7 +581,7 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 flex flex-col items-center justify-start p-2 sm:p-4 relative overflow-y-auto touch-pan-y">
+                    <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-4 relative overflow-y-auto touch-pan-y">
                         {isTeacher ? (
                             <div className="text-center opacity-70">
                                 <div className="text-4xl sm:text-6xl mb-4">👀</div>
@@ -598,13 +598,13 @@ export default function QuizGame(props: QuizGameProps) {
                                 </div>
                             </div>
                         ) : currentQuestion ? (
-                            <div className="w-full max-w-3xl flex flex-col items-center gap-3 sm:gap-6 pt-4 pb-8">
-                                <h2 className="text-lg sm:text-3xl font-bold text-center leading-relaxed px-2">
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-2 sm:gap-6 pt-2 pb-4">
+                                <h2 className="text-base sm:text-3xl font-bold text-center leading-snug px-2">
                                     {currentQuestion.question}
                                 </h2>
 
                                 {/* Mobile & Desktop: 2x2 Grid */}
-                                <div className="w-full grid grid-cols-2 gap-3 sm:gap-4 px-2">
+                                <div className="w-full grid grid-cols-2 gap-2 sm:gap-4 px-2">
                                     {currentQuestion.options.map((option, idx) => {
                                         const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
                                         const isSelected = selectedOption === idx;
@@ -622,17 +622,17 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null}
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative rounded-xl p-3 sm:p-4 font-bold 
+                                                    relative rounded-xl p-2 sm:p-4 font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
                                                     break-words leading-tight
-                                                    h-24 sm:h-32
-                                                    text-sm sm:text-xl
+                                                    min-h-[70px] sm:h-32
+                                                    text-xs sm:text-xl
                                                 `}
                                             >
                                                 {showWrongFeedback && isSelected && (
-                                                    <X className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                                                    <X className="absolute top-1 right-1 w-4 h-4 sm:w-6 sm:h-6 text-white" />
                                                 )}
                                                 <span className="line-clamp-3 px-1 sm:px-2">{option}</span>
                                             </button>
