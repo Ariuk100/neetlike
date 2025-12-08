@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, RefreshCw, Trophy, Flag, RotateCcw, Timer, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Slider } from "@/components/ui/slider";
 
@@ -32,7 +32,7 @@ interface PhotonRaceProps {
         gameStatus?: string;
         players?: Record<string, PlayerStats>;
         envs?: { id: string; name: string; n: number; color: string }[];
-        raceStartedAt?: any; // Timestamp or number
+        raceStartedAt?: Timestamp | number; // Timestamp or number
         duration?: number;
         pointA?: { x: number; y: number };
         pointB?: { x: number; y: number };
@@ -65,11 +65,18 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     const myId = userName.replace(/\s+/g, '_');
 
     // Helper to safely get millis
-    const getSafeMillis = (val: any): number => {
+    const getSafeMillis = (val: unknown): number => {
         if (!val) return 0;
         if (typeof val === 'number') return val;
-        if (val.toMillis) return val.toMillis();
-        if (val.seconds) return val.seconds * 1000;
+        // Check for Firestore Timestamp structure (has toMillis method)
+        if (val && typeof (val as Timestamp).toMillis === 'function') {
+            return (val as Timestamp).toMillis();
+        }
+        // Handle raw object { seconds, nanoseconds } just in case
+        const tVal = val as { seconds?: number };
+        if (typeof tVal.seconds === 'number') {
+            return tVal.seconds * 1000;
+        }
         return 0;
     };
 

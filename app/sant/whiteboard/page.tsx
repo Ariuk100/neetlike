@@ -16,8 +16,6 @@ import EndSessionDialog from '@/components/sant/EndSessionDialog';
 import {
     Sheet,
     SheetContent,
-    SheetHeader,
-    SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet';
 

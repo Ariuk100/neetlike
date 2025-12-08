@@ -164,8 +164,9 @@ export default function WhiteboardCanvas({
 
     // Check for active games and lock tools for students
     const activeGame = elements.find(el => {
-        if (el.type === 'photon_game' && (el as any).gameStatus === 'racing') return true;
-        if (el.type === 'quiz_game' && (el as any).gameStatus === 'playing') return true;
+        const gameEl = el as { gameStatus?: string; type: string };
+        if (el.type === 'photon_game' && gameEl.gameStatus === 'racing') return true;
+        if (el.type === 'quiz_game' && gameEl.gameStatus === 'playing') return true;
         return false;
     });
 

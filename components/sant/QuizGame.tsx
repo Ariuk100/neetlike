@@ -38,7 +38,7 @@ interface QuizGameElement {
     questions?: Question[];
     gameStatus?: 'editing' | 'waiting' | 'playing' | 'showing_answer' | 'finished';
     // Removed global currentQuestionIndex for gameplay (still might exist in old data)
-    questionStartedAt?: any; // Timestamp or number
+    questionStartedAt?: Timestamp | number; // Timestamp or number
     players?: Record<string, PlayerScore>;
     defaultTimeLimit?: number;
 }
@@ -80,11 +80,19 @@ export default function QuizGame(props: QuizGameProps) {
 
 
     // Helper to safely get millis from potential Timestamp or number
-    const getSafeMillis = (val: any): number => {
+    const getSafeMillis = (val: unknown): number => {
         if (!val) return 0;
         if (typeof val === 'number') return val;
-        if (val.toMillis) return val.toMillis(); // Firestore Timestamp
-        if (val.seconds) return val.seconds * 1000; // Raw object sometimes
+
+        // Firestore Timestamp
+        if (val && typeof (val as Timestamp).toMillis === 'function') {
+            return (val as Timestamp).toMillis();
+        }
+
+        // Raw object sometimes
+        const tVal = val as { seconds?: number };
+        if (typeof tVal.seconds === 'number') return tVal.seconds * 1000;
+
         return 0;
     };
 
