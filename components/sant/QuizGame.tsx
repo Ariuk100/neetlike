@@ -170,7 +170,7 @@ export default function QuizGame(props: QuizGameProps) {
     // Sorted leaderboard
     const leaderboard = useMemo(() => {
         return Object.values(players)
-            .sort((a, b) => b.totalScore - a.totalScore);
+            .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
     }, [players]);
 
     // My rank
@@ -336,7 +336,7 @@ export default function QuizGame(props: QuizGameProps) {
             // Penalty: -200 points
             // Do NOT advance index.
             const penalty = 200;
-            const newScore = currentPlayerData.totalScore - penalty;
+            const newScore = (currentPlayerData.totalScore || 0) - penalty;
 
             const updatedPlayer: PlayerScore = {
                 ...currentPlayerData,
@@ -434,11 +434,11 @@ export default function QuizGame(props: QuizGameProps) {
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto px-4">
                             <Button onClick={handleStartQuiz} size="lg" className="bg-green-500 hover:bg-green-600 w-full sm:w-auto">
                                 <Play className="w-5 h-5 mr-2" />
-                                Эхлүүлэх
+                                <span className="text-white">Эхлүүлэх</span>
                             </Button>
                             <Button onClick={handleReset} variant="outline" className="border-white/30 text-white hover:bg-white/10 w-full sm:w-auto">
                                 <RotateCcw className="w-4 h-4 mr-2" />
-                                Дахин
+                                <span className="text-white">Дахин</span>
                             </Button>
                         </div>
                     ) : (
@@ -477,9 +477,9 @@ export default function QuizGame(props: QuizGameProps) {
                                     `}>
                                         {i + 1}
                                     </span>
-                                    <span className="truncate text-sm font-medium max-w-[80px] sm:max-w-[120px]">{player.name}</span>
+                                    <span className="truncate text-sm font-medium max-w-[80px] sm:max-w-[120px]">{player.name || 'Unknown'}</span>
                                 </div>
-                                <span className="text-xs font-bold text-yellow-300">{player.totalScore}</span>
+                                <span className="text-xs font-bold text-yellow-300">{player.totalScore || 0}</span>
                             </div>
                             {/* Progress Bar */}
                             <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">

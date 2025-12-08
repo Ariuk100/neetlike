@@ -665,15 +665,18 @@ export default function WhiteboardCanvas({
     };
 
     // New logic: Show toolbar for students too (subset of tools)
-    const showToolbar = isTeacher || (canDraw);
+    // HIDE toolbar for students if a game is active (Photon Race / Quiz) - they should focus on the game
+    const showToolbar = isTeacher || (canDraw && !isGameActive);
 
     return (
         <>
             <div className="flex flex-col items-center justify-center w-full h-full bg-stone-100 gap-4">
-                {/* Toolbar - Visible to Teacher AND Students (who are allowed) */}
+                {/* Toolbar - Visible to Teacher AND Students (who are allowed and NOT playing a game) */}
                 {showToolbar && (<>
                     {/* UNIFIED MAIN TOOLBAR */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 flex items-center gap-2 pointer-events-auto border border-stone-200 max-w-[95vw] overflow-x-auto scrollbar-hide z-50">
+                        {/* ... components ... */}
+
                         {/* 1. LESSON CONTROLS (Teacher Only) */}
                         {isTeacher && (
                             <div className="flex items-center gap-1 flex-shrink-0 mr-1 border-r border-stone-200 pr-1">
@@ -1078,7 +1081,7 @@ export default function WhiteboardCanvas({
                     )}
 
                     {/* Page Indicator for Students (read-only) */}
-                    {!isTeacher && totalPages > 1 && (
+                    {!isTeacher && totalPages > 1 && !isGameActive && (
                         <div className="absolute bottom-3 right-3 bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-medium pointer-events-none z-40 backdrop-blur-sm">
                             Хуудас {currentPage + 1} / {totalPages}
                         </div>
