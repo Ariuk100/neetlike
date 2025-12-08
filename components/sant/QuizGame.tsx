@@ -541,7 +541,7 @@ export default function QuizGame(props: QuizGameProps) {
                 {/* Main Game Area (Visible if Desktop OR ActiveTab is Game) */}
                 <div className={`flex-1 flex flex-col relative ${activeTab === 'game' ? 'flex' : 'hidden lg:flex'}`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-black/20">
+                    <div className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-3 bg-black/20">
                         <div className="flex items-center gap-2">
                             {/* Only show title on desktop to save space on mobile */}
                             <span className="font-bold hidden sm:inline">Quiz Race</span>
@@ -598,13 +598,13 @@ export default function QuizGame(props: QuizGameProps) {
                                 </div>
                             </div>
                         ) : currentQuestion ? (
-                            <div className="w-full max-w-3xl flex flex-col items-center gap-2 sm:gap-6 pt-2 pb-4">
-                                <h2 className="text-base sm:text-3xl font-bold text-center leading-snug px-2">
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-1 sm:gap-6 pt-1 pb-2">
+                                <h2 className="text-sm sm:text-3xl font-bold text-center leading-tight px-2 mb-1">
                                     {currentQuestion.question}
                                 </h2>
 
                                 {/* Mobile & Desktop: 2x2 Grid */}
-                                <div className="w-full grid grid-cols-2 gap-2 sm:gap-4 px-2">
+                                <div className="w-full grid grid-cols-2 gap-1.5 sm:gap-4 px-2">
                                     {currentQuestion.options.map((option, idx) => {
                                         const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
                                         const isSelected = selectedOption === idx;
@@ -622,19 +622,19 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null}
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative rounded-xl p-2 sm:p-4 font-bold 
+                                                    relative rounded-lg sm:rounded-xl p-1.5 sm:p-4 font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
                                                     break-words leading-tight
-                                                    min-h-[70px] sm:h-32
-                                                    text-xs sm:text-xl
+                                                    min-h-[50px] sm:h-32
+                                                    text-[10px] sm:text-xl
                                                 `}
                                             >
                                                 {showWrongFeedback && isSelected && (
-                                                    <X className="absolute top-1 right-1 w-4 h-4 sm:w-6 sm:h-6 text-white" />
+                                                    <X className="absolute top-0.5 right-0.5 w-3 h-3 sm:w-6 sm:h-6 text-white" />
                                                 )}
-                                                <span className="line-clamp-3 px-1 sm:px-2">{option}</span>
+                                                <span className="line-clamp-2 sm:line-clamp-3 px-0.5 sm:px-2">{option}</span>
                                             </button>
                                         );
                                     })}
