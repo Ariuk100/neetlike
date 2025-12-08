@@ -603,38 +603,45 @@ export default function QuizGame(props: QuizGameProps) {
                                     {currentQuestion.question}
                                 </h2>
 
-                                <div className="grid grid-cols-2 gap-2 sm:gap-4 w-full px-2">
-                                    {currentQuestion.options.map((option, idx) => {
-                                        const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
-                                        const isSelected = selectedOption === idx;
+                                {/* Mobile: Horizontal scroll, Desktop: 2x2 Grid */}
+                                <div className="w-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory sm:snap-none scrollbar-hide">
+                                    <div className="flex sm:grid sm:grid-cols-2 gap-3 sm:gap-4 px-2 sm:px-2">
+                                        {currentQuestion.options.map((option, idx) => {
+                                            const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
+                                            const isSelected = selectedOption === idx;
 
-                                        // Feedback styles
-                                        let btnStyle = `${colors.bg} ${colors.hover} ${colors.text}`;
-                                        if (showWrongFeedback && isSelected) {
-                                            btnStyle = 'bg-red-600 animate-shake ring-4 ring-red-400';
-                                        }
+                                            // Feedback styles
+                                            let btnStyle = `${colors.bg} ${colors.hover} ${colors.text}`;
+                                            if (showWrongFeedback && isSelected) {
+                                                btnStyle = 'bg-red-600 animate-shake ring-4 ring-red-400';
+                                            }
 
-                                        return (
-                                            <button
-                                                key={idx}
-                                                onClick={() => handleAnswer(idx)}
-                                                disabled={selectedOption !== null} // Disable while processing
-                                                className={`
-                                                    ${btnStyle} 
-                                                    relative h-14 sm:h-32 rounded-xl p-2 sm:p-4 text-sm sm:text-xl font-bold 
-                                                    transition-transform active:scale-95 shadow-lg
-                                                    flex items-center justify-center text-center
-                                                    disabled:opacity-80 disabled:cursor-not-allowed
-                                                    break-words leading-tight
-                                                `}
-                                            >
-                                                {showWrongFeedback && isSelected && (
-                                                    <X className="absolute top-1 right-1 sm:top-2 sm:right-2 w-4 h-4 sm:w-6 sm:h-6 text-white" />
-                                                )}
-                                                <span className="line-clamp-3">{option}</span>
-                                            </button>
-                                        );
-                                    })}
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => handleAnswer(idx)}
+                                                    disabled={selectedOption !== null}
+                                                    className={`
+                                                        ${btnStyle} 
+                                                        relative rounded-xl p-3 sm:p-4 font-bold 
+                                                        transition-transform active:scale-95 shadow-lg
+                                                        flex items-center justify-center text-center
+                                                        disabled:opacity-80 disabled:cursor-not-allowed
+                                                        break-words leading-tight
+                                                        min-w-[80vw] sm:min-w-0 h-32 sm:h-32
+                                                        snap-center sm:snap-align-none
+                                                        text-base sm:text-xl
+                                                        flex-shrink-0 sm:flex-shrink
+                                                    `}
+                                                >
+                                                    {showWrongFeedback && isSelected && (
+                                                        <X className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                                                    )}
+                                                    <span className="line-clamp-4 px-2">{option}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         ) : (
