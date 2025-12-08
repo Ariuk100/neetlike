@@ -95,11 +95,19 @@ export default function SantPage() {
     const duration =
       startTime ? Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) : null;
 
-    // Оноо алдагдах алдааны засвар (problems, totalScore-г хассан)
+    // Оноо болон бодлогуудыг бэлтгэнэ
+    const problemsArray = problems.map((p) => ({
+      id: p.id,
+      title: p.title,
+      score: scores[p.id] ?? 0,
+      maxScore: p.maxScore,
+    }));
+
     const finalPayload = {
       name: current?.name,
       className: current?.class,
       code: current?.code,
+      problems: problemsArray,
       startTime,
       endTime,
       duration,
@@ -142,8 +150,8 @@ export default function SantPage() {
     showSummary,
     setShowSummary,
     clearWarningTimer,
-    // endExam-г тогтвортой байлгахын тулд scores, problems-г хамаарлаас хассан.
-    // Эцсийн дүнг сервер тооцох тул эдгээр нь энд шаардлагагүй.
+    problems,
+    scores,
   ]);
 
   // === ШИНЭ: Дүрэм зөрчлийн нэгдсэн удирдлага ===

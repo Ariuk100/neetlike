@@ -45,6 +45,20 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // "santexam" collection-ийн дүрэм (Шалгалт өгч байгаа сурагчид)
+    // Багшийн хуудас уншиж болно
+    match /santexam/{code} {
+      allow read: if true;
+      allow write: if false; // Зөвхөн server-side API-ээр бичнэ
+    }
+
+    // "santresult" collection-ийн дүрэм (Шалгалт дууссан сурагчид)
+    // Багшийн хуудас уншиж болно
+    match /santresult/{code} {
+      allow read: if true;
+      allow write: if false; // Зөвхөн server-side API-ээр бичнэ
+    }
+
     // Бусад бүх collection-д хандахыг хориглоно (аюулгүй байдлын үүднээс)
     match /{document=**} {
       allow read, write: if false;
