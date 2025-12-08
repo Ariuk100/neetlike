@@ -581,7 +581,7 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-y-auto touch-pan-y">
+                    <div className="flex-1 flex flex-col items-center justify-start p-2 sm:p-4 relative overflow-y-auto touch-pan-y">
                         {isTeacher ? (
                             <div className="text-center opacity-70">
                                 <div className="text-4xl sm:text-6xl mb-4">👀</div>
@@ -598,7 +598,7 @@ export default function QuizGame(props: QuizGameProps) {
                                 </div>
                             </div>
                         ) : currentQuestion ? (
-                            <div className="w-full max-w-3xl flex flex-col items-center gap-4 sm:gap-6 my-auto">
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-3 sm:gap-6 pt-4 pb-8">
                                 <h2 className="text-lg sm:text-3xl font-bold text-center leading-relaxed px-2">
                                     {currentQuestion.question}
                                 </h2>
@@ -621,7 +621,7 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null} // Disable while processing
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative h-16 sm:h-32 rounded-xl p-2 sm:p-4 text-sm sm:text-xl font-bold 
+                                                    relative h-14 sm:h-32 rounded-xl p-2 sm:p-4 text-sm sm:text-xl font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
