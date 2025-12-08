@@ -123,7 +123,8 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
         const relPoints = points.map(p => ({ x: p.x / w, y: p.y / h }));
 
         const lastP = relPoints[relPoints.length - 1];
-        const finished = lastP && Math.hypot(lastP.x - pointB.x, lastP.y - pointB.y) < 0.15; // 15% threshold
+        // Point B radius is 14px, on ~400px canvas = ~0.035 relative. Use 0.05 (5%) for good UX
+        const finished = lastP && Math.hypot(lastP.x - pointB.x, lastP.y - pointB.y) < 0.05;
 
         if (finished || forced) {
             let totalTime = 99999;
@@ -171,12 +172,24 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
 
     const handleAutoSubmit = useCallback(() => submitResult(pathPoints, true), [submitResult, pathPoints]);
 
+    // Sync submittedRef with hasSubmitted from Firestore
+    // When teacher clears players, hasSubmitted becomes false, allowing resubmission
+    useEffect(() => {
+        if (!hasSubmitted) {
+            submittedRef.current = false;
+        }
+    }, [hasSubmitted]);
+
     // --------------------------------------------------------------------------------
     // 1. TIMER & LOOP
     // --------------------------------------------------------------------------------
     useEffect(() => {
         if (gameStatus !== 'racing' || !raceStartedAt) {
-            if (gameStatus === 'waiting') setTimeLeft(raceDuration);
+            if (gameStatus === 'waiting') {
+                setTimeLeft(raceDuration);
+                // Reset submission flag when game is waiting (allows resubmission in new rounds)
+                submittedRef.current = false;
+            }
             return;
         }
 
@@ -211,6 +224,8 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     // --------------------------------------------------------------------------------
     const handleStartRace = async (e: React.MouseEvent) => {
         e.stopPropagation();
+        // Reset submission flag for all students when starting new race
+        submittedRef.current = false;
         await updateGameElement({
             gameStatus: 'racing',
             players: {},
@@ -264,12 +279,19 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
         if (isTeacher) {
             const Ax = pointA.x * w; const Ay = pointA.y * h;
             const Bx = pointB.x * w; const By = pointB.y * h;
-            if (Math.hypot(x - Ax, y - Ay) < 20) { draggingPoint.current = 'A'; return; }
-            if (Math.hypot(x - Bx, y - By) < 20) { draggingPoint.current = 'B'; return; }
+            if (Math.hypot(x - Ax, y - Ay) < 15) { draggingPoint.current = 'A'; return; }
+            if (Math.hypot(x - Bx, y - By) < 15) { draggingPoint.current = 'B'; return; }
         }
 
         // Else Start Drawing (If allowed)
         if ((isAllowedDraw || isTeacher) && gameStatus === 'racing' && !hasSubmitted && timeLeft > 0) {
+            // MUST start near point A (within 50px)
+            const Ax = pointA.x * w; const Ay = pointA.y * h;
+            const distFromA = Math.hypot(x - Ax, y - Ay);
+            if (distFromA > 50) {
+                // Too far from point A, don't start drawing
+                return;
+            }
             draggingPoint.current = null;
             isDrawing.current = true;
             setPathPoints([{ x, y }]);

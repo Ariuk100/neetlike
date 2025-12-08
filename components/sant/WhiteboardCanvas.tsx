@@ -671,8 +671,8 @@ export default function WhiteboardCanvas({
     return (
         <>
             <div className="flex flex-col items-center justify-center w-full h-full bg-stone-100 gap-4">
-                {/* Toolbar - Visible to Teacher AND Students (who are allowed and NOT playing a game) */}
-                {showToolbar && (<>
+                {/* Teacher Toolbar - Inside whiteboard (absolute positioned) */}
+                {showToolbar && isTeacher && (<>
                     {/* UNIFIED MAIN TOOLBAR */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 flex items-center gap-2 pointer-events-auto border border-stone-200 max-w-[95vw] overflow-x-auto scrollbar-hide z-50">
                         {/* ... components ... */}
@@ -1087,6 +1087,89 @@ export default function WhiteboardCanvas({
                         </div>
                     )}
                 </div>
+
+                {/* Student Toolbar - Outside whiteboard (below canvas) */}
+                {showToolbar && !isTeacher && (
+                    <div className="w-full max-w-4xl bg-white rounded-full shadow-2xl p-2 flex items-center justify-center gap-2 border border-stone-200 overflow-x-auto scrollbar-hide">
+                        {/* Drawing Tools for Students */}
+                        <Button
+                            variant={tool === 'cursor' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('cursor')}
+                            className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0"
+                            title="Заагч (V)"
+                        >
+                            <MousePointer className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'pen' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('pen')}
+                            disabled={!isAllowedToWrite || isGameActive}
+                            className={`rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 ${!isAllowedToWrite || isGameActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Үзэг (P)"
+                        >
+                            <Pen className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'eraser' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('eraser')}
+                            disabled={!isAllowedToWrite || isGameActive}
+                            className={`rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 ${!isAllowedToWrite || isGameActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Баллуур (E)"
+                        >
+                            <Eraser className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'laser' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('laser')}
+                            className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Лазер (L)"
+                        >
+                            <Target className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+
+                        <div className="w-px h-6 bg-stone-200 mx-1 flex-shrink-0" />
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0"
+                                    style={{ color }}
+                                    disabled={!isAllowedToWrite || isGameActive}
+                                >
+                                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-current bg-current" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64">
+                                <div className="grid grid-cols-5 gap-2">
+                                    {COLORS.map((c) => (
+                                        <button
+                                            key={c}
+                                            className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-stone-900 scale-110' : 'border-transparent hover:scale-110'}`}
+                                            style={{ backgroundColor: c }}
+                                            onClick={() => setColor(c)}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="mt-4">
+                                    <label className="text-xs font-bold text-stone-500 mb-2 block">Зураасны өргөн</label>
+                                    <Slider
+                                        value={[width]}
+                                        min={1}
+                                        max={20}
+                                        step={1}
+                                        onValueChange={([v]) => setWidth(v)}
+                                    />
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                )}
             </div>
 
             {/* Input Dialogs */}

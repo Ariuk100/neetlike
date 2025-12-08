@@ -161,10 +161,35 @@ export default function QuizGame(props: QuizGameProps) {
             const elapsed = (Date.now() - myQuestionStartTime) / 1000;
             const remaining = Math.max(0, timeLimit - elapsed);
             setTimeLeft(remaining);
+
+            // Auto-advance when time runs out
+            if (remaining <= 0 && currentQuestion) {
+                // Time's up! Move to next question without scoring
+                const currentPlayerData = players[myId] || {
+                    name: userName,
+                    totalScore: 0,
+                    correctCount: 0,
+                    answers: [],
+                    currentQuestionIndex: 0,
+                    lastAnsweredAt: Date.now()
+                };
+
+                const updatedPlayer: PlayerScore = {
+                    ...currentPlayerData,
+                    currentQuestionIndex: (currentPlayerData.currentQuestionIndex || 0) + 1,
+                    lastAnsweredAt: Date.now()
+                };
+
+                updateQuizElement({
+                    [`players.${myId}`]: updatedPlayer
+                });
+
+                toast.warning('Цаг дууслаа! Дараагийн асуулт');
+            }
         }, 100);
 
         return () => clearInterval(interval);
-    }, [gameStatus, isFinished, myQuestionStartTime, timeLimit, showWrongFeedback, isTeacher, updateQuizElement]);
+    }, [gameStatus, isFinished, myQuestionStartTime, timeLimit, showWrongFeedback, isTeacher, updateQuizElement, currentQuestion, players, myId, userName]);
 
 
     // Sorted leaderboard
@@ -578,7 +603,7 @@ export default function QuizGame(props: QuizGameProps) {
                                     {currentQuestion.question}
                                 </h2>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full px-2">
+                                <div className="grid grid-cols-2 gap-2 sm:gap-4 w-full px-2">
                                     {currentQuestion.options.map((option, idx) => {
                                         const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
                                         const isSelected = selectedOption === idx;
@@ -596,7 +621,7 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null} // Disable while processing
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative h-20 sm:h-32 rounded-xl p-3 sm:p-4 text-base sm:text-xl font-bold 
+                                                    relative h-16 sm:h-32 rounded-xl p-2 sm:p-4 text-sm sm:text-xl font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
@@ -604,9 +629,9 @@ export default function QuizGame(props: QuizGameProps) {
                                                 `}
                                             >
                                                 {showWrongFeedback && isSelected && (
-                                                    <X className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                                                    <X className="absolute top-1 right-1 sm:top-2 sm:right-2 w-4 h-4 sm:w-6 sm:h-6 text-white" />
                                                 )}
-                                                {option}
+                                                <span className="line-clamp-3">{option}</span>
                                             </button>
                                         );
                                     })}
