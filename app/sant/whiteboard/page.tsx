@@ -403,7 +403,7 @@ function WhiteboardContent() {
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Анги сонгох" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="max-h-[300px] overflow-y-auto">
                                                 {data.classes.map(c => (
                                                     <SelectItem key={c} value={c}>{c}</SelectItem>
                                                 ))}
@@ -417,7 +417,7 @@ function WhiteboardContent() {
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Нэр сонгох" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="max-h-[300px] overflow-y-auto">
                                                 {selectedClass && data.students[selectedClass]?.map(s => (
                                                     <SelectItem key={s} value={s}>{s}</SelectItem>
                                                 ))}

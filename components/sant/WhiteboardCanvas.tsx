@@ -671,128 +671,114 @@ export default function WhiteboardCanvas({
         <>
             <div className="flex flex-col items-center justify-center w-full h-full bg-stone-100 gap-4">
                 {/* Toolbar - Visible to Teacher AND Students (who are allowed) */}
-                {showToolbar && (
-                    <div className="flex-none bg-white/90 backdrop-blur shadow-lg rounded-full px-4 py-2 sm:px-6 sm:py-3 flex items-center gap-2 sm:gap-4 border border-stone-200 z-30 max-w-[95%] overflow-x-auto">
-
+                {showToolbar && (<>
+                    {/* UNIFIED MAIN TOOLBAR */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 flex items-center gap-2 pointer-events-auto border border-stone-200 max-w-[95vw] overflow-x-auto scrollbar-hide z-50">
                         {/* 1. LESSON CONTROLS (Teacher Only) */}
                         {isTeacher && (
-                            <>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setLoadLessonOpen(true)}
-                                        className="rounded-full gap-2 text-stone-600 hover:text-stone-900 px-3"
-                                        title="Хичээл нээх"
-                                    >
-                                        <FolderOpen className="w-4 h-4" />
-                                        <span className="text-xs font-medium hidden sm:inline">Нээх</span>
-                                    </Button>
-
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setSaveLessonOpen(true)}
-                                        className="rounded-full gap-2 text-stone-600 hover:text-stone-900 px-3"
-                                        title="Бэлдэх / Хадгалах"
-                                    >
-                                        <FileUp className="w-4 h-4" />
-                                        <span className="text-xs font-medium hidden sm:inline">Бэлдэх</span>
-                                    </Button>
-
-
-
-
-
-
-
-                                    <div className="h-6 w-px bg-stone-200 mx-1" />
-                                </div>
-                            </>
+                            <div className="flex items-center gap-1 flex-shrink-0 mr-1 border-r border-stone-200 pr-1">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setLoadLessonOpen(true)}
+                                    className="rounded-full w-10 h-10 min-w-[40px] text-stone-600 hover:text-stone-900 flex-shrink-0"
+                                    title="Хичээл нээх"
+                                >
+                                    <FolderOpen className="w-5 h-5" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSaveLessonOpen(true)}
+                                    className="rounded-full w-10 h-10 min-w-[40px] text-stone-600 hover:text-stone-900 flex-shrink-0"
+                                    title="Бэлдэх / Хадгалах"
+                                >
+                                    <FileUp className="w-5 h-5" />
+                                </Button>
+                            </div>
                         )}
 
                         {/* 2. DRAWING TOOLS */}
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-lg p-2 flex items-center gap-2 pointer-events-auto border border-stone-200">
-                            <Button
-                                variant={tool === 'cursor' ? 'secondary' : 'ghost'}
-                                size="icon"
-                                onClick={() => setTool('cursor')}
-                                className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
-                                title="Заагч (V)"
-                            >
-                                <MousePointer className="w-5 h-5 sm:w-6 sm:h-6" />
-                            </Button>
-                            <Button
-                                variant={tool === 'pen' ? 'secondary' : 'ghost'}
-                                size="icon"
-                                onClick={() => setTool('pen')}
-                                disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
-                                className={`rounded-full w-10 h-10 sm:w-12 sm:h-12 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title="Үзэг (P)"
-                            >
-                                <Pen className="w-5 h-5 sm:w-6 sm:h-6" />
-                            </Button>
-                            <Button
-                                variant={tool === 'eraser' ? 'secondary' : 'ghost'}
-                                size="icon"
-                                onClick={() => setTool('eraser')}
-                                disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
-                                className={`rounded-full w-10 h-10 sm:w-12 sm:h-12 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title="Баллуур (E)"
-                            >
-                                <Eraser className="w-5 h-5 sm:w-6 sm:h-6" />
-                            </Button>
-                            <Button
-                                variant={tool === 'laser' ? 'secondary' : 'ghost'}
-                                size="icon"
-                                onClick={() => setTool('laser')}
-                                className="rounded-full w-10 h-10 sm:w-12 sm:h-12 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                title="Лазер (L)"
-                            >
-                                <Target className="w-5 h-5 sm:w-6 sm:h-6" />
-                            </Button>
+                        <Button
+                            variant={tool === 'cursor' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('cursor')}
+                            className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0"
+                            title="Заагч (V)"
+                        >
+                            <MousePointer className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'pen' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('pen')}
+                            disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                            className={`rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Үзэг (P)"
+                        >
+                            <Pen className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'eraser' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('eraser')}
+                            disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                            className={`rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Баллуур (E)"
+                        >
+                            <Eraser className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
+                        <Button
+                            variant={tool === 'laser' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setTool('laser')}
+                            className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Лазер (L)"
+                        >
+                            <Target className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </Button>
 
-                            <div className="w-px h-6 bg-stone-200 mx-1" />
+                        <div className="w-px h-6 bg-stone-200 mx-1 flex-shrink-0" />
 
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
-                                        style={{ color }}
-                                        disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
-                                    >
-                                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-current bg-current" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-64">
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {COLORS.map((c) => (
-                                            <button
-                                                key={c}
-                                                className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-stone-900 scale-110' : 'border-transparent hover:scale-110'}`}
-                                                style={{ backgroundColor: c }}
-                                                onClick={() => setColor(c)}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="mt-4">
-                                        <label className="text-xs font-bold text-stone-500 mb-2 block">Зураасны өргөн</label>
-                                        <Slider
-                                            value={[width]}
-                                            min={1}
-                                            max={20}
-                                            step={1}
-                                            onValueChange={([v]) => setWidth(v)}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="rounded-full w-10 h-10 min-w-[40px] sm:w-12 sm:h-12 flex-shrink-0"
+                                    style={{ color }}
+                                    disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                                >
+                                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-current bg-current" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64">
+                                <div className="grid grid-cols-5 gap-2">
+                                    {COLORS.map((c) => (
+                                        <button
+                                            key={c}
+                                            className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-stone-900 scale-110' : 'border-transparent hover:scale-110'}`}
+                                            style={{ backgroundColor: c }}
+                                            onClick={() => setColor(c)}
                                         />
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>         {/* Teacher ONLY Controls */}
+                                    ))}
+                                </div>
+                                <div className="mt-4">
+                                    <label className="text-xs font-bold text-stone-500 mb-2 block">Зураасны өргөн</label>
+                                    <Slider
+                                        value={[width]}
+                                        min={1}
+                                        max={20}
+                                        step={1}
+                                        onValueChange={([v]) => setWidth(v)}
+                                    />
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        {/* 3. TEACHER EXTRAS (Media, Page Nav, etc) */}
                         {isTeacher && (
                             <>
-                                {/* Media Buttons */}
                                 <div className="h-6 w-px bg-stone-200 flex-shrink-0" />
 
                                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -808,37 +794,37 @@ export default function WhiteboardCanvas({
                                         size="icon"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={isUploading}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900 flex-shrink-0"
                                         title="Зураг нэмэх"
                                     >
-                                        <ImageIcon className="w-4 h-4" />
+                                        <ImageIcon className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setTextDialogOpen(true)}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900 flex-shrink-0"
                                         title="Текст нэмэх"
                                     >
-                                        <Type className="w-4 h-4" />
+                                        <Type className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setVideoDialogOpen(true)}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900 flex-shrink-0"
                                         title="Видео нэмэх"
                                     >
-                                        <Video className="w-4 h-4" />
+                                        <Video className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setIframeDialogOpen(true)}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900 flex-shrink-0"
                                         title="Simulation / Embed нэмэх"
                                     >
-                                        <Globe className="w-4 h-4" />
+                                        <Globe className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
 
                                     <DropdownMenu>
@@ -846,10 +832,10 @@ export default function WhiteboardCanvas({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-purple-600 hover:text-purple-900"
+                                                className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-purple-600 hover:text-purple-900 flex-shrink-0"
                                                 title="Тоглоом нэмэх"
                                             >
-                                                <Trophy className="w-4 h-4" />
+                                                <Trophy className="w-5 h-5 sm:w-4 sm:h-4" />
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent>
@@ -874,26 +860,26 @@ export default function WhiteboardCanvas({
                                         variant="ghost"
                                         size="sm"
                                         onClick={togglePermissions}
-                                        className={`rounded-full gap-2 px-3 ${!isAllowedToWrite ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'text-stone-500 hover:bg-stone-100'}`}
+                                        className={`rounded-full gap-2 px-3 flex-shrink-0 ${!isAllowedToWrite ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'text-stone-500 hover:bg-stone-100'}`}
                                         title={isAllowedToWrite ? "Сурагчдыг цоожлох" : "Сурагчдыг нээх"}
                                     >
                                         {isAllowedToWrite ? (
                                             <>
-                                                <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                                <span className="text-xs font-normal whitespace-nowrap">Цоожлох</span>
+                                                <Lock className="w-4 h-4" />
+                                                <span className="text-xs font-normal whitespace-nowrap hidden sm:inline">Цоожлох</span>
                                             </>
                                         ) : (
                                             <>
-                                                <Unlock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                                <span className="text-xs font-semibold whitespace-nowrap">Нээх</span>
+                                                <Unlock className="w-4 h-4" />
+                                                <span className="text-xs font-semibold whitespace-nowrap hidden sm:inline">Нээх</span>
                                             </>
                                         )}
                                     </Button>
 
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-red-500 hover:text-red-700 hover:bg-red-50" title="Цэвэрлэх">
-                                                <Trash2 className="w-4 h-4" />
+                                            <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 min-w-[40px] sm:w-10 sm:h-10 text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0" title="Цэвэрлэх">
+                                                <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
                                             </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
@@ -913,7 +899,6 @@ export default function WhiteboardCanvas({
                                     </AlertDialog>
                                 </div>
 
-                                {/* Page Navigation */}
                                 <div className="h-6 w-px bg-stone-200 flex-shrink-0" />
 
                                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -922,13 +907,13 @@ export default function WhiteboardCanvas({
                                         size="icon"
                                         onClick={() => onNavigatePage?.(-1)}
                                         disabled={currentPage <= 0}
-                                        className="rounded-full w-8 h-8"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-8 sm:h-8 flex-shrink-0"
                                         title="Өмнөх хуудас"
                                     >
-                                        <ChevronLeft className="w-4 h-4" />
+                                        <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
 
-                                    <span className="text-sm font-medium text-stone-600 min-w-[60px] text-center">
+                                    <span className="text-sm font-medium text-stone-600 min-w-[40px] sm:min-w-[60px] text-center flex-shrink-0">
                                         {currentPage + 1} / {totalPages}
                                     </span>
 
@@ -937,20 +922,20 @@ export default function WhiteboardCanvas({
                                         size="icon"
                                         onClick={() => onNavigatePage?.(1)}
                                         disabled={currentPage >= totalPages - 1}
-                                        className="rounded-full w-8 h-8"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-8 sm:h-8 flex-shrink-0"
                                         title="Дараах хуудас"
                                     >
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
 
                                     <Button
                                         variant="outline"
                                         size="icon"
                                         onClick={onAddPage}
-                                        className="rounded-full w-8 h-8 ml-1 border-dashed"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-8 sm:h-8 ml-1 border-dashed flex-shrink-0"
                                         title="Шинэ хуудас нэмэх"
                                     >
-                                        <Plus className="w-4 h-4" />
+                                        <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
 
                                     <Button
@@ -958,10 +943,10 @@ export default function WhiteboardCanvas({
                                         size="icon"
                                         onClick={() => setDeletePageDialogOpen(true)}
                                         disabled={totalPages <= 1}
-                                        className="rounded-full w-8 h-8 ml-1 border-dashed text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        className="rounded-full w-10 h-10 min-w-[40px] sm:w-8 sm:h-8 ml-1 border-dashed text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
                                         title="Хуудас устгах"
                                     >
-                                        <FileMinus className="w-4 h-4" />
+                                        <FileMinus className="w-5 h-5 sm:w-4 sm:h-4" />
                                     </Button>
 
                                     <AlertDialog open={deletePageDialogOpen} onOpenChange={setDeletePageDialogOpen}>
@@ -984,7 +969,7 @@ export default function WhiteboardCanvas({
                             </>
                         )}
                     </div>
-                )}
+                </>)}
 
 
                 <div ref={containerRef} className="relative w-full aspect-video max-h-full bg-white rounded-lg shadow-lg overflow-hidden touch-none">
