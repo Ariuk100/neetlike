@@ -1,8 +1,10 @@
+'use client';
+
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, RefreshCw, Trophy, Flag, RotateCcw, Timer, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Slider } from "@/components/ui/slider";
 
@@ -30,7 +32,7 @@ interface PhotonRaceProps {
         gameStatus?: string;
         players?: Record<string, PlayerStats>;
         envs?: { id: string; name: string; n: number; color: string }[];
-        raceStartedAt?: number;
+        raceStartedAt?: any; // Timestamp or number
         duration?: number;
         pointA?: { x: number; y: number };
         pointB?: { x: number; y: number };
@@ -47,6 +49,9 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     const [pathPoints, setPathPoints] = useState<{ x: number, y: number }[]>([]);
     const [timeLeft, setTimeLeft] = useState(10.0);
 
+    // Mobile Tab State
+    const [activeTab, setActiveTab] = useState<'race' | 'leaderboard'>('race');
+
     // Canvas refs
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +63,17 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     const players = element.players || {};
     const envs = element.envs || ENVIRONMENTS;
     const myId = userName.replace(/\s+/g, '_');
-    const raceStartedAt = element.raceStartedAt || 0;
+
+    // Helper to safely get millis
+    const getSafeMillis = (val: any): number => {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        if (val.toMillis) return val.toMillis();
+        if (val.seconds) return val.seconds * 1000;
+        return 0;
+    };
+
+    const raceStartedAt = getSafeMillis(element.raceStartedAt);
     const raceDuration = element.duration || 10; // Seconds
 
     // Points A and B (Percent coordinates 0-1)
@@ -82,10 +97,8 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     // --------------------------------------------------------------------------------
     const updateGameElement = useCallback(async (updates: Record<string, unknown>) => {
         try {
-            console.log('🔥 Updating Firestore:', updates);
             const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(props.currentPage), 'elements', element.id);
             await updateDoc(elementRef, updates);
-            console.log('✅ Firestore update success');
         } catch (e) {
             console.error('❌ Firestore error:', e);
         }
@@ -194,7 +207,7 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
         await updateGameElement({
             gameStatus: 'racing',
             players: {},
-            raceStartedAt: Date.now()
+            raceStartedAt: serverTimestamp()
         });
         toast.success(`Уралдаан эхэллээ! ${raceDuration} секунд!`);
     };
@@ -257,6 +270,8 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     };
 
     const interact = (e: React.PointerEvent) => {
+        // Only stop prop if interacting with THIS canvas
+        // (Pointer events on canvas usually imply this, but failsafe)
         e.stopPropagation();
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -266,16 +281,6 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
         const y = e.clientY - rect.top;
 
         if (draggingPoint.current) {
-            // Update temp local state or throttled update?
-            // For smoothness, direct update to Firestore is bad.
-            // But we need visual feedback. 
-            // We'll trust the loop to render? No, we need state.
-            // Let's just update Firestore on UP, but here we can't visualize easily without state.
-            // Just update Firestore? Rate limit?
-            // Better: update local state, then sync on UP.
-            // Since we rely on 'element' prop for rendering A/B, we might feel lag.
-            // Optimistic update required? 
-            // For now, let's just send updates. It might limit FPS but it works.
             updateGameElement({
                 [draggingPoint.current === 'A' ? 'pointA' : 'pointB']: { x: x / rect.width, y: y / rect.height }
             });
@@ -300,104 +305,167 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     // --------------------------------------------------------------------------------
     useEffect(() => {
         const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!canvas || !ctx) return;
+        const container = containerRef.current;
+        // Use container dimensions if available for full responsiveness
+        if (!canvas || !container) return;
 
-        canvas.width = canvas.parentElement?.clientWidth || 300;
-        canvas.height = canvas.parentElement?.clientHeight || 300;
-        const w = canvas.width;
-        const h = canvas.height;
+        const resizeObserver = new ResizeObserver(() => {
+            const rect = container.getBoundingClientRect();
+            // Set canvas logic dimensions matching CSS dimensions
+            canvas.width = rect.width;
+            canvas.height = rect.height;
 
-        ctx.clearRect(0, 0, w, h);
+            // Re-render
+            renderCanvas();
+        });
 
-        // Grid Lines
-        ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+        resizeObserver.observe(container);
 
-        const Ax = pointA.x * w; const Ay = pointA.y * h;
-        const Bx = pointB.x * w; const By = pointB.y * h;
+        const renderCanvas = () => {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
 
-        // Draw My Path
-        if (pathPoints.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
-            for (let i = 1; i < pathPoints.length; i++) ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
-            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
-        }
+            const w = canvas.width;
+            const h = canvas.height;
 
-        // Points
-        const drawPoint = (x: number, y: number, label: string) => {
-            ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = 'black'; ctx.fill();
-            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = 'white'; ctx.font = 'bold 10px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(label, x, y);
+            ctx.clearRect(0, 0, w, h);
+
+            // Grid Lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+
+            const Ax = pointA.x * w; const Ay = pointA.y * h;
+            const Bx = pointB.x * w; const By = pointB.y * h;
+
+            // Draw My Path
+            if (pathPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+                for (let i = 1; i < pathPoints.length; i++) ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
+            }
+
+            // Points
+            const drawPoint = (x: number, y: number, label: string, color: string) => {
+                // Outer glow/stroke
+                ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2);
+                ctx.fillStyle = color; ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
+
+                // Label
+                ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label, x, y);
+            };
+            drawPoint(Ax, Ay, 'A', '#16A34A'); // Green
+            drawPoint(Bx, By, 'B', '#DC2626'); // Red
         };
-        drawPoint(Ax, Ay, 'A');
-        drawPoint(Bx, By, 'B');
 
+        // Initial paint
+        renderCanvas();
+
+        return () => resizeObserver.disconnect();
     }, [pathPoints, envs, timeLeft, pointA, pointB, gameStatus]);
 
+    const Leaderboard = () => (
+        <div className="h-full border-l bg-stone-50 overflow-y-auto p-2 custom-scrollbar touch-pan-y">
+            <div className="text-xs font-bold uppercase text-stone-500 mb-2 sticky top-0 bg-stone-50 py-1 z-10">Leaderboard</div>
+            {Object.values(players)
+                .filter((p: PlayerStats) => p.time && p.time < 99990)
+                .sort((a: PlayerStats, b: PlayerStats) => (a.time || 9999) - (b.time || 9999))
+                .map((p: PlayerStats, i) => (
+                    <div key={i} className={`flex items-center justify-between text-xs p-2 rounded mb-1 ${p.name === userName ? 'bg-blue-100 ring-1 ring-blue-300' : 'bg-white border'} `}>
+                        <div className="flex items-center gap-2">
+                            <span className={`font-mono w-4 text-center ${i === 0 ? 'text-yellow-600 font-bold' : 'text-stone-400'} `}>{i + 1}</span>
+                            <span className="truncate max-w-[80px]">{p.name}</span>
+                        </div>
+                        <span className="font-mono font-semibold">{p.time?.toFixed(1)}</span>
+                    </div>
+                ))}
+            {Object.keys(players).length === 0 && (
+                <div className="text-xs text-stone-400 p-2 text-center">No results yet</div>
+            )}
+        </div>
+    );
+
     return (
-        <div className="flex flex-col w-full h-full bg-white relative overflow-hidden select-none">
-            {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 bg-stone-50 border-b z-20">
-                <div className="flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-yellow-500" />
-                    <span className="font-bold text-sm hidden sm:inline">Photon</span>
-                    <div className="flex items-center gap-1 bg-stone-200 rounded px-2 py-0.5 ml-1">
-                        <Timer className="w-3 h-3" />
-                        <span className={`text - xs font - mono font - bold ${timeLeft < 3 && gameStatus === 'racing' ? 'text-red-600 animate-pulse' : 'text-stone-700'} `}>
-                            {timeLeft.toFixed(1)}s
-                        </span>
+        <div className="flex flex-col lg:flex-row w-full h-full bg-white relative overflow-hidden select-none">
+            {/* Mobile Tab Switcher */}
+            <div className="lg:hidden flex border-b bg-stone-100">
+                <button
+                    onClick={() => setActiveTab('race')}
+                    className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 ${activeTab === 'race' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-stone-500'}`}
+                >
+                    <Flag className="w-4 h-4" /> Race
+                </button>
+                <button
+                    onClick={() => setActiveTab('leaderboard')}
+                    className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 ${activeTab === 'leaderboard' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-stone-500'}`}
+                >
+                    <Trophy className="w-4 h-4" /> Leaderboard
+                </button>
+            </div>
+
+            {/* Main Game Area (Visible if Desktop OR ActiveTab is Race) */}
+            <div className={`flex-1 flex flex-col relative ${activeTab === 'race' ? 'flex' : 'hidden lg:flex'}`}>
+                {/* Header Controls */}
+                <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-stone-50 border-b z-20 gap-2">
+                    <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-yellow-500" />
+                        <span className="font-bold text-sm hidden sm:inline">Photon</span>
+                        <div className="flex items-center gap-1 bg-stone-200 rounded px-2 py-0.5 ml-1">
+                            <Timer className="w-3 h-3" />
+                            <span className={`text-xs font-mono font-bold ${timeLeft < 3 && gameStatus === 'racing' ? 'text-red-600 animate-pulse' : 'text-stone-700'} `}>
+                                {timeLeft.toFixed(1)}s
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 ml-auto">
+                        {/* Teacher Controls */}
+                        {isTeacher && (
+                            <>
+                                <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
+                                    <span className="text-[10px] text-stone-500 font-bold uppercase hidden sm:inline">Time:</span>
+                                    <Slider
+                                        className="w-16 sm:w-20"
+                                        min={5} max={60} step={5}
+                                        value={[raceDuration]}
+                                        onValueChange={([v]) => updateGameElement({ duration: v })}
+                                        disabled={gameStatus === 'racing'}
+                                    />
+                                    <span className="text-xs w-5 text-center">{raceDuration}</span>
+                                </div>
+
+                                {gameStatus === 'racing' ? (
+                                    <Button size="sm" variant="destructive" onClick={handleStopRace} className="h-7 px-2 text-xs sm:h-8 sm:px-3 sm:text-sm">
+                                        <StopCircle className="w-3 h-3 mr-1" /> <span className="hidden sm:inline">Stop</span>
+                                    </Button>
+                                ) : (
+                                    <div className="flex gap-1">
+                                        <Button size="sm" variant="outline" onClick={handleShuffle} className="h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-3">
+                                            <RefreshCw className="w-3 h-3 sm:mr-1" />
+                                        </Button>
+                                        <Button size="sm" onClick={handleStartRace} className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs sm:h-8 sm:px-3 sm:text-sm">
+                                            <Play className="w-3 h-3 mr-1" /> Start
+                                        </Button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Student Reset */}
+                        {!isTeacher && gameStatus === 'racing' && !hasSubmitted && (
+                            <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={handleResetPath}>
+                                <RotateCcw className="w-3 h-3 mr-1" /> Reset
+                            </Button>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex gap-2">
-                    {/* Teacher Controls */}
-                    {isTeacher && (
-                        <>
-                            <div className="flex items-center gap-2 mr-2">
-                                <span className="text-[10px] text-stone-500 font-bold uppercase">Time:</span>
-                                <Slider
-                                    className="w-20"
-                                    min={5} max={60} step={5}
-                                    value={[raceDuration]}
-                                    onValueChange={([v]) => updateGameElement({ duration: v })}
-                                    disabled={gameStatus === 'racing'}
-                                />
-                                <span className="text-xs w-6 text-center">{raceDuration}s</span>
-                            </div>
-
-                            {gameStatus === 'racing' ? (
-                                <Button size="sm" variant="destructive" onClick={handleStopRace}>
-                                    <StopCircle className="w-3 h-3 mr-1" /> Stop
-                                </Button>
-                            ) : (
-                                <div className="flex gap-1">
-                                    <Button size="sm" variant="outline" onClick={handleShuffle}><RefreshCw className="w-3 h-3" /></Button>
-                                    <Button size="sm" onClick={handleStartRace} className="bg-green-600 hover:bg-green-700">
-                                        <Play className="w-3 h-3 mr-1" /> Start
-                                    </Button>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Student Reset */}
-                    {!isTeacher && gameStatus === 'racing' && !hasSubmitted && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleResetPath}>
-                            <RotateCcw className="w-3 h-3 mr-1" /> Reset
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Game Body */}
-            <div className="flex flex-1 relative">
-                <div className="flex-1 relative" ref={containerRef}>
+                {/* Canvas Container */}
+                <div className="flex-1 relative w-full h-full overflow-hidden" ref={containerRef}>
                     {/* Environment Layer */}
                     <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 w-full h-full pointer-events-none">
                         {envs.map((env: { id: string; name: string; n: number; color: string }, i: number) => (
@@ -407,44 +475,44 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
                         ))}
                     </div>
 
-                    {/* Interactive Layer */}
+                    {/* Interactive Layer (Canvas) */}
                     <canvas
                         ref={canvasRef}
-                        className={`absolute inset - 0 w - full h - full z - 10 touch - none outline - none ${isTeacher ? 'cursor-move' : (gameStatus === 'racing' && !hasSubmitted ? 'cursor-crosshair' : 'cursor-default')
-                            } `}
+                        className={`absolute inset-0 w-full h-full z-10 touch-none outline-none ${isTeacher ? 'cursor-move' : (gameStatus === 'racing' && !hasSubmitted ? 'cursor-crosshair' : 'cursor-default')} `}
                         onPointerDown={startInteraction}
                         onPointerMove={interact}
                         onPointerUp={endInteraction}
                         onPointerLeave={endInteraction}
                     />
+
                     {/* Rank Display for all players when game is finished */}
                     {gameStatus === 'finished' && hasSubmitted && myRank > 0 && (
-                        <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center flex-col animate-in zoom-in duration-500">
+                        <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center flex-col animate-in zoom-in duration-500 bg-white/30 backdrop-blur-[1px]">
                             {myRank === 1 && (
                                 <>
-                                    <div className="text-6xl mb-2">🎉</div>
-                                    <div className="bg-yellow-400 text-black px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-xl">ТҮРҮҮЛЛЭЭ!</div>
+                                    <div className="text-5xl sm:text-6xl mb-2">🎉</div>
+                                    <div className="bg-yellow-400 text-black px-4 sm:px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-lg sm:text-xl">ТҮРҮҮЛЛЭЭ!</div>
                                 </>
                             )}
                             {myRank === 2 && (
                                 <>
-                                    <div className="text-6xl mb-2">🥈</div>
-                                    <div className="bg-gray-300 text-black px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-xl">2-р байр!</div>
+                                    <div className="text-5xl sm:text-6xl mb-2">🥈</div>
+                                    <div className="bg-gray-300 text-black px-4 sm:px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-lg sm:text-xl">2-р байр!</div>
                                 </>
                             )}
                             {myRank === 3 && (
                                 <>
-                                    <div className="text-6xl mb-2">🥉</div>
-                                    <div className="bg-amber-600 text-white px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-xl">3-р байр!</div>
+                                    <div className="text-5xl sm:text-6xl mb-2">🥉</div>
+                                    <div className="bg-amber-600 text-white px-4 sm:px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-lg sm:text-xl">3-р байр!</div>
                                 </>
                             )}
                             {myRank > 3 && (
                                 <>
-                                    <div className="text-5xl mb-2">🏁</div>
-                                    <div className="bg-blue-500 text-white px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-xl">{myRank}-р байр</div>
+                                    <div className="text-4xl sm:text-5xl mb-2">🏁</div>
+                                    <div className="bg-blue-500 text-white px-4 sm:px-6 py-2 rounded-full font-bold shadow-xl border-4 border-white text-lg sm:text-xl">{myRank}-р байр</div>
                                 </>
                             )}
-                            <div className="mt-2 text-sm bg-white/80 px-3 py-1 rounded-full">
+                            <div className="mt-2 text-sm bg-white/80 px-3 py-1 rounded-full shadow">
                                 Хугацаа: {myStats?.time?.toFixed(2)}
                             </div>
                         </div>
@@ -457,29 +525,12 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
                         </Button>
                     )}
                 </div>
+            </div>
 
-                {/* Sidebar */}
-                <div className="w-48 border-l bg-stone-50 overflow-y-auto p-2">
-                    <div className="text-xs font-bold uppercase text-stone-500 mb-2">Leaderboard</div>
-                    {Object.values(players)
-                        .filter((p: PlayerStats) => p.time && p.time < 99990)
-                        .sort((a: PlayerStats, b: PlayerStats) => (a.time || 9999) - (b.time || 9999))
-                        .map((p: PlayerStats, i) => (
-                            <div key={i} className={`flex items - center justify - between text - xs p - 2 rounded mb - 1 ${p.name === userName ? 'bg-blue-100 ring-1 ring-blue-300' : 'bg-white border'} `}>
-                                <div className="flex items-center gap-2">
-                                    <span className={`font - mono w - 4 text - center ${i === 0 ? 'text-yellow-600 font-bold' : 'text-stone-400'} `}>{i + 1}</span>
-                                    <span className="truncate max-w-[80px]">{p.name}</span>
-                                </div>
-                                <span className="font-mono font-semibold">{p.time?.toFixed(1)}</span>
-                            </div>
-                        ))}
-                </div>
+            {/* Sidebar (Leaderboard) - Conditionally rendered */}
+            <div className={`w-full lg:w-48 lg:border-l bg-stone-50 flex-shrink-0 ${activeTab === 'leaderboard' ? 'flex-1 overflow-hidden' : 'hidden lg:block'}`}>
+                <Leaderboard />
             </div>
         </div>
     );
 }
-
-
-
-// NOTE: I need to update ElementLayer to pass 'currentPage' and 'updateDoc' capability or pass the full path.
-// Or I can import db and construct path if I have identifiers.

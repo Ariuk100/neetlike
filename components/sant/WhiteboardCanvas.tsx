@@ -17,6 +17,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from 'sonner';
 import ElementLayer, { WhiteboardElement } from './ElementLayer';
@@ -135,7 +143,39 @@ export default function WhiteboardCanvas({
     const [loadLessonOpen, setLoadLessonOpen] = useState(false);
     const [deletePageDialogOpen, setDeletePageDialogOpen] = useState(false);
 
+
+
     const [selectedElement, setSelectedElement] = useState<string | null>(null);
+    const [elements, setElements] = useState<WhiteboardElement[]>([]); // To track game status
+
+    // Sync elements to detect active games
+    useEffect(() => {
+        if (!sessionId) return;
+        const q = query(collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const newElements: WhiteboardElement[] = [];
+            snapshot.forEach((doc) => {
+                newElements.push({ id: doc.id, ...doc.data() } as WhiteboardElement);
+            });
+            setElements(newElements);
+        });
+        return () => unsubscribe();
+    }, [sessionId, currentPage]);
+
+    // Check for active games and lock tools for students
+    const activeGame = elements.find(el => {
+        if (el.type === 'photon_game' && (el as any).gameStatus === 'racing') return true;
+        if (el.type === 'quiz_game' && (el as any).gameStatus === 'playing') return true;
+        return false;
+    });
+
+    const isGameActive = !!activeGame;
+
+    useEffect(() => {
+        if (!isTeacher && isGameActive) {
+            setTool('cursor');
+        }
+    }, [isTeacher, isGameActive]);
 
     // Initialize canvas context
     useEffect(() => {
@@ -671,87 +711,84 @@ export default function WhiteboardCanvas({
                         )}
 
                         {/* 2. DRAWING TOOLS */}
-                        <div className="flex gap-2 flex-shrink-0">
-                            {/* Cursor Tool */}
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-lg p-2 flex items-center gap-2 pointer-events-auto border border-stone-200">
                             <Button
-                                variant={tool === 'cursor' ? 'default' : 'ghost'}
+                                variant={tool === 'cursor' ? 'secondary' : 'ghost'}
                                 size="icon"
                                 onClick={() => setTool('cursor')}
-                                className="rounded-full w-8 h-8 sm:w-10 sm:h-10"
-                                title="Сонгох / Хөдөлгөх"
+                                className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
+                                title="Заагч (V)"
                             >
-                                <MousePointer className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <MousePointer className="w-5 h-5 sm:w-6 sm:h-6" />
                             </Button>
-
-                            {/* Laser Tool (Teacher Only) */}
-                            {isTeacher && (
-                                <Button
-                                    variant={tool === 'laser' ? 'default' : 'ghost'}
-                                    size="icon"
-                                    onClick={() => setTool('laser')}
-                                    className={`rounded-full w-8 h-8 sm:w-10 sm:h-10 ${tool === 'laser' ? 'bg-red-500 hover:bg-red-600' : 'text-red-500 hover:bg-red-50'}`}
-                                    title="Лазер заагч"
-                                >
-                                    <Target className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                            )}
-
                             <Button
-                                variant={tool === 'pen' ? 'default' : 'ghost'}
+                                variant={tool === 'pen' ? 'secondary' : 'ghost'}
                                 size="icon"
                                 onClick={() => setTool('pen')}
-                                className="rounded-full w-8 h-8 sm:w-10 sm:h-10"
-                                title="Үзэг"
+                                disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                                className={`rounded-full w-10 h-10 sm:w-12 sm:h-12 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title="Үзэг (P)"
                             >
-                                <Pen className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Pen className="w-5 h-5 sm:w-6 sm:h-6" />
                             </Button>
                             <Button
-                                variant={tool === 'eraser' ? 'default' : 'ghost'}
+                                variant={tool === 'eraser' ? 'secondary' : 'ghost'}
                                 size="icon"
                                 onClick={() => setTool('eraser')}
-                                className="rounded-full w-8 h-8 sm:w-10 sm:h-10"
-                                title="Баллуур"
+                                disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                                className={`rounded-full w-10 h-10 sm:w-12 sm:h-12 ${!isAllowedToWrite || (!isTeacher && isGameActive) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title="Баллуур (E)"
                             >
-                                <Eraser className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Eraser className="w-5 h-5 sm:w-6 sm:h-6" />
                             </Button>
-                        </div>
+                            <Button
+                                variant={tool === 'laser' ? 'secondary' : 'ghost'}
+                                size="icon"
+                                onClick={() => setTool('laser')}
+                                className="rounded-full w-10 h-10 sm:w-12 sm:h-12 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                title="Лазер (L)"
+                            >
+                                <Target className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </Button>
 
-                        <div className="h-6 w-px bg-stone-200 flex-shrink-0" />
+                            <div className="w-px h-6 bg-stone-200 mx-1" />
 
-                        <div className="flex items-center gap-2 w-24 sm:w-32 flex-shrink-0">
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
-                                        variant="outline"
-                                        className="w-8 h-8 rounded-full p-0 border-2 shadow-sm flex-shrink-0"
-                                        style={{ backgroundColor: color, borderColor: '#e7e5e4' }}
-                                    />
+                                        variant="ghost"
+                                        size="icon"
+                                        className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
+                                        style={{ color }}
+                                        disabled={!isAllowedToWrite || (!isTeacher && isGameActive)}
+                                    >
+                                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-current bg-current" />
+                                    </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-fit p-3" side="top">
+                                <PopoverContent className="w-64">
                                     <div className="grid grid-cols-5 gap-2">
                                         {COLORS.map((c) => (
                                             <button
                                                 key={c}
-                                                className={`w-8 h-8 rounded-full border border-stone-200 transition-transform hover:scale-110 focus:outline-none ring-offset-2 ${color === c ? 'ring-2 ring-stone-900' : ''}`}
+                                                className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-stone-900 scale-110' : 'border-transparent hover:scale-110'}`}
                                                 style={{ backgroundColor: c }}
                                                 onClick={() => setColor(c)}
                                             />
                                         ))}
                                     </div>
+                                    <div className="mt-4">
+                                        <label className="text-xs font-bold text-stone-500 mb-2 block">Зураасны өргөн</label>
+                                        <Slider
+                                            value={[width]}
+                                            min={1}
+                                            max={20}
+                                            step={1}
+                                            onValueChange={([v]) => setWidth(v)}
+                                        />
+                                    </div>
                                 </PopoverContent>
                             </Popover>
-
-                            <Slider
-                                value={[width]}
-                                min={1}
-                                max={20}
-                                step={1}
-                                onValueChange={([v]) => setWidth(v)}
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Teacher ONLY Controls */}
+                        </div>         {/* Teacher ONLY Controls */}
                         {isTeacher && (
                             <>
                                 {/* Media Buttons */}
@@ -802,24 +839,31 @@ export default function WhiteboardCanvas({
                                     >
                                         <Globe className="w-4 h-4" />
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={createPhotonGameElement}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-stone-600 hover:text-stone-900"
-                                        title="Photon Race Тоглоом нэмэх"
-                                    >
-                                        <Trophy className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={createQuizGameElement}
-                                        className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-purple-600 hover:text-purple-900"
-                                        title="Quiz Game нэмэх"
-                                    >
-                                        <HelpCircle className="w-4 h-4" />
-                                    </Button>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="rounded-full w-8 h-8 sm:w-10 sm:h-10 text-purple-600 hover:text-purple-900"
+                                                title="Тоглоом нэмэх"
+                                            >
+                                                <Trophy className="w-4 h-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuLabel>Тоглоом сонгох</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={createPhotonGameElement}>
+                                                <Trophy className="mr-2 h-4 w-4" />
+                                                <span>Photon Race</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={createQuizGameElement}>
+                                                <HelpCircle className="mr-2 h-4 w-4" />
+                                                <span>Quiz Game</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
 
                                 <div className="h-6 w-px bg-stone-200 flex-shrink-0" />

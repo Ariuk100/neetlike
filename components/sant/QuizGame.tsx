@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Trophy, Clock, HelpCircle, Check, X, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -38,7 +38,7 @@ interface QuizGameElement {
     questions?: Question[];
     gameStatus?: 'editing' | 'waiting' | 'playing' | 'showing_answer' | 'finished';
     // Removed global currentQuestionIndex for gameplay (still might exist in old data)
-    questionStartedAt?: number; // Game started at
+    questionStartedAt?: any; // Timestamp or number
     players?: Record<string, PlayerScore>;
     defaultTimeLimit?: number;
 }
@@ -71,10 +71,24 @@ export default function QuizGame(props: QuizGameProps) {
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [showWrongFeedback, setShowWrongFeedback] = useState(false); // Local feedback for wrong answer
 
+    // Mobile View State
+    const [activeTab, setActiveTab] = useState<'game' | 'leaderboard'>('game');
+
     // Element data
     const questions = element.questions || [];
     const gameStatus = element.gameStatus || 'editing';
-    const gameStartedAt = element.questionStartedAt || 0; // "questionStartedAt" effectively becomes "gameStartedAt"
+
+
+    // Helper to safely get millis from potential Timestamp or number
+    const getSafeMillis = (val: any): number => {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        if (val.toMillis) return val.toMillis(); // Firestore Timestamp
+        if (val.seconds) return val.seconds * 1000; // Raw object sometimes
+        return 0;
+    };
+
+    const gameStartedAt = getSafeMillis(element.questionStartedAt);
     const players = useMemo(() => element.players || {}, [element.players]);
     const defaultTimeLimit = element.defaultTimeLimit || DEFAULT_TIME_LIMIT;
 
@@ -249,7 +263,7 @@ export default function QuizGame(props: QuizGameProps) {
 
         await updateQuizElement({
             gameStatus: 'playing',
-            questionStartedAt: Date.now(),
+            questionStartedAt: serverTimestamp(),
             players: {} // Reset players
         });
         toast.success('Quiz эхэллээ! (Race Mode)');
@@ -280,9 +294,11 @@ export default function QuizGame(props: QuizGameProps) {
         if (isCorrect) {
             // --- CORRECT ANSWER ---
             // Calculate score: Max 1000, decays over time
-            const ratio = responseTime / (timeLimit * 1000);
+            // Guard against division by zero
+            const safeTimeLimit = timeLimit > 0 ? timeLimit : 5;
+            const ratio = responseTime / (safeTimeLimit * 1000);
             const timeFactor = 1 - (ratio / 2); // 1.0 to 0.5
-            const earnedScore = Math.round(1000 * timeFactor);
+            const earnedScore = Math.max(0, Math.round(1000 * timeFactor)) || 0; // Guard NaN
 
             const newAnswer = {
                 questionId: currentQuestion.id,
@@ -294,11 +310,11 @@ export default function QuizGame(props: QuizGameProps) {
 
             const updatedPlayer: PlayerScore = {
                 ...currentPlayerData,
-                totalScore: currentPlayerData.totalScore + earnedScore,
-                correctCount: currentPlayerData.correctCount + 1,
-                answers: [...currentPlayerData.answers, newAnswer],
-                currentQuestionIndex: currentPlayerData.currentQuestionIndex + 1, // Advance!
-                lastAnsweredAt: now // Reset timer for next Q
+                totalScore: (currentPlayerData.totalScore || 0) + earnedScore,
+                correctCount: (currentPlayerData.correctCount || 0) + 1,
+                answers: [...(currentPlayerData.answers || []), newAnswer],
+                currentQuestionIndex: (currentPlayerData.currentQuestionIndex || 0) + 1, // Advance!
+                lastAnsweredAt: now // Reset timer for next Q (Local assumption ok for own progress)
             };
 
             await updateQuizElement({
@@ -339,9 +355,6 @@ export default function QuizGame(props: QuizGameProps) {
         }
     };
 
-    // Teacher next question action (REMOVED for self-paced, keeping for legacy data cleanup if needed or just empty)
-    // const handleNextQuestion = async () => { ... }
-
     const handleReset = async () => {
         await updateQuizElement({
             gameStatus: 'editing',
@@ -359,10 +372,10 @@ export default function QuizGame(props: QuizGameProps) {
     // Editing mode - Teacher enters JSON
     if (gameStatus === 'editing' && isTeacher) {
         return (
-            <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 p-4 text-white">
-                <div className="flex items-center gap-2 mb-4">
+            <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 p-2 sm:p-4 text-white">
+                <div className="flex items-center gap-2 mb-2 sm:mb-4">
                     <HelpCircle className="w-5 h-5 text-yellow-400" />
-                    <span className="font-bold">Quiz Game - Асуулт оруулах</span>
+                    <span className="font-bold text-sm sm:text-base">Quiz Game - Асуулт оруулах</span>
                 </div>
 
                 <div className="flex-1 flex flex-col gap-3">
@@ -379,10 +392,10 @@ export default function QuizGame(props: QuizGameProps) {
     }
   ]
 }`}
-                        className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50 font-mono text-sm"
+                        className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50 font-mono text-xs sm:text-sm"
                     />
 
-                    <Button onClick={handleParseJSON} className="bg-green-500 hover:bg-green-600">
+                    <Button onClick={handleParseJSON} className="bg-green-500 hover:bg-green-600 w-full sm:w-auto self-end">
                         <Check className="w-4 h-4 mr-2" />
                         JSON шалгах
                     </Button>
@@ -394,7 +407,7 @@ export default function QuizGame(props: QuizGameProps) {
     // Waiting mode - Ready to start
     if (gameStatus === 'waiting') {
         return (
-            <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 p-4 text-white">
+            <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 p-4 text-white text-center">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <HelpCircle className="w-5 h-5 text-yellow-400" />
@@ -406,22 +419,22 @@ export default function QuizGame(props: QuizGameProps) {
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                    <div className="text-6xl">🎯</div>
-                    <div className="text-xl font-bold">Quiz бэлэн боллоо!</div>
+                    <div className="text-4xl sm:text-6xl">🎯</div>
+                    <div className="text-lg sm:text-xl font-bold">Quiz бэлэн боллоо!</div>
 
                     {isTeacher ? (
-                        <div className="flex gap-2">
-                            <Button onClick={handleStartQuiz} size="lg" className="bg-green-500 hover:bg-green-600">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto px-4">
+                            <Button onClick={handleStartQuiz} size="lg" className="bg-green-500 hover:bg-green-600 w-full sm:w-auto">
                                 <Play className="w-5 h-5 mr-2" />
                                 Эхлүүлэх
                             </Button>
-                            <Button onClick={handleReset} variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                            <Button onClick={handleReset} variant="outline" className="border-white/30 text-white hover:bg-white/10 w-full sm:w-auto">
                                 <RotateCcw className="w-4 h-4 mr-2" />
                                 Дахин
                             </Button>
                         </div>
                     ) : (
-                        <div className="text-white/70">Багш эхлүүлэхийг хүлээж байна...</div>
+                        <div className="text-white/70 animate-pulse">Багш эхлүүлэхийг хүлээж байна...</div>
                     )}
                 </div>
             </div>
@@ -430,28 +443,88 @@ export default function QuizGame(props: QuizGameProps) {
 
     // Playing mode (includes showing "Finished" state for individual player)
     if (gameStatus === 'playing') {
+        const LeaderboardPanel = () => (
+            <div className="h-full bg-black/30 lg:border-l border-white/10 flex flex-col">
+                <div className="p-3 border-b border-white/10 font-bold bg-black/20 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-yellow-400" />
+                    Leaderboard
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar touch-pan-y">
+                    {leaderboard.map((player, i) => (
+                        <div
+                            key={player.name}
+                            className={`
+                                flex flex-col p-2 rounded 
+                                ${player.name === userName ? 'bg-white/20 ring-1 ring-white/50' : 'bg-white/5'}
+                                transition-all hover:bg-white/10
+                            `}
+                        >
+                            <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <span className={`
+                                        w-5 h-5 flex items-center justify-center rounded text-xs font-bold
+                                        ${i === 0 ? 'bg-yellow-400 text-black' :
+                                            i === 1 ? 'bg-gray-300 text-black' :
+                                                i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-white/70'}
+                                    `}>
+                                        {i + 1}
+                                    </span>
+                                    <span className="truncate text-sm font-medium max-w-[80px] sm:max-w-[120px]">{player.name}</span>
+                                </div>
+                                <span className="text-xs font-bold text-yellow-300">{player.totalScore}</span>
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${Math.min(100, (player.currentQuestionIndex / questions.length) * 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
 
         return (
-            <div className="flex flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white overflow-hidden">
-                {/* Main Game Area (70-75%) */}
-                <div className="flex-1 flex flex-col relative border-r border-white/10">
+            <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white overflow-hidden">
+
+                {/* Mobile Tab Switcher */}
+                <div className="lg:hidden flex border-b border-white/10 bg-black/20">
+                    <button
+                        onClick={() => setActiveTab('game')}
+                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'game' ? 'bg-white/10 text-white' : 'text-white/50'}`}
+                    >
+                        <Play className="w-4 h-4" /> Game
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('leaderboard')}
+                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'leaderboard' ? 'bg-white/10 text-white' : 'text-white/50'}`}
+                    >
+                        <Trophy className="w-4 h-4" /> Leaderboard
+                    </button>
+                </div>
+
+                {/* Main Game Area (Visible if Desktop OR ActiveTab is Game) */}
+                <div className={`flex-1 flex flex-col relative ${activeTab === 'game' ? 'flex' : 'hidden lg:flex'}`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-black/20">
+                    <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-black/20">
                         <div className="flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5 text-yellow-400" />
-                            <span className="font-bold">Quiz Race</span>
+                            {/* Only show title on desktop to save space on mobile */}
+                            <span className="font-bold hidden sm:inline">Quiz Race</span>
+                            <span className="font-bold sm:hidden">Quiz</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                             {!isFinished && !isTeacher && (
                                 <>
-                                    <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${timeLeft < 2 ? 'bg-red-500 animate-pulse' : 'bg-white/20'}`}>
-                                        <Clock className="w-4 h-4" />
-                                        <span className="font-mono font-bold">
+                                    <div className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full ${timeLeft < 2 ? 'bg-red-500 animate-pulse' : 'bg-white/20'}`}>
+                                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                                        <span className="font-mono font-bold text-sm sm:text-base">
                                             {timeLeft.toFixed(1)}s
                                         </span>
                                     </div>
-                                    <div className="text-sm bg-white/20 px-3 py-1 rounded-full">
-                                        Q: {Math.min(myQuestionIndex + 1, questions.length)}/{questions.length}
+                                    <div className="text-xs sm:text-sm bg-white/20 px-2 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                                        {Math.min(myQuestionIndex + 1, questions.length)} / {questions.length}
                                     </div>
                                 </>
                             )}
@@ -463,10 +536,10 @@ export default function QuizGame(props: QuizGameProps) {
                                         size="sm"
                                         className="h-7 text-xs px-2 hover:bg-red-600"
                                     >
-                                        <RotateCcw className="w-3 h-3 mr-1" />
-                                        Дуусгах / Шинэ
+                                        <RotateCcw className="w-3 h-3 sm:mr-1" />
+                                        <span className="hidden sm:inline">Дуусгах</span>
                                     </Button>
-                                    <div className="bg-white/20 text-white h-7 px-3 flex items-center rounded text-xs pointer-events-none">
+                                    <div className="bg-white/20 text-white h-7 px-2 sm:px-3 flex items-center rounded text-xs pointer-events-none whitespace-nowrap">
                                         Live View
                                     </div>
                                 </div>
@@ -475,31 +548,31 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
+                    <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-y-auto touch-pan-y">
                         {isTeacher ? (
                             <div className="text-center opacity-70">
-                                <div className="text-6xl mb-4">👀</div>
-                                <div className="text-xl">Сурагчдын явцыг баруун талын самбараас харна уу.</div>
+                                <div className="text-4xl sm:text-6xl mb-4">👀</div>
+                                <div className="text-base sm:text-xl px-4">Сурагчдын явцыг {activeTab === 'game' ? 'Leaderboard хэсгээс' : 'баруун талын самбараас'} харна уу.</div>
                             </div>
                         ) : isFinished ? (
-                            <div className="text-center animate-zoom-in">
-                                <div className="text-6xl mb-4">🏆</div>
-                                <h2 className="text-3xl font-bold mb-2">Баяр хүргэе!</h2>
-                                <p className="text-xl opacity-80 mb-4">Та бүх асуултанд хариуллаа.</p>
+                            <div className="text-center animate-zoom-in p-4">
+                                <div className="text-4xl sm:text-6xl mb-4">🏆</div>
+                                <h2 className="text-2xl sm:text-3xl font-bold mb-2">Баяр хүргэе!</h2>
+                                <p className="text-base sm:text-xl opacity-80 mb-4">Та бүх асуултанд хариуллаа.</p>
                                 <div className="bg-white/10 p-4 rounded-xl inline-block min-w-[200px]">
                                     <div className="text-sm uppercase tracking-wider opacity-60">Нийт оноо</div>
-                                    <div className="text-4xl font-bold text-yellow-400">{myScore?.totalScore || 0}</div>
+                                    <div className="text-3xl sm:text-4xl font-bold text-yellow-400">{myScore?.totalScore || 0}</div>
                                 </div>
                             </div>
                         ) : currentQuestion ? (
-                            <div className="w-full max-w-3xl flex flex-col items-center gap-6">
-                                <h2 className="text-2xl sm:text-3xl font-bold text-center leading-relaxed">
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-4 sm:gap-6 my-auto">
+                                <h2 className="text-lg sm:text-3xl font-bold text-center leading-relaxed px-2">
                                     {currentQuestion.question}
                                 </h2>
 
-                                <div className="grid grid-cols-2 gap-4 w-full">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full px-2">
                                     {currentQuestion.options.map((option, idx) => {
-                                        const colors = OPTION_COLORS[idx];
+                                        const colors = OPTION_COLORS[idx % OPTION_COLORS.length];
                                         const isSelected = selectedOption === idx;
 
                                         // Feedback styles
@@ -515,14 +588,15 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null} // Disable while processing
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative h-24 sm:h-32 rounded-xl p-4 text-xl font-bold 
+                                                    relative h-20 sm:h-32 rounded-xl p-3 sm:p-4 text-base sm:text-xl font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
+                                                    break-words leading-tight
                                                 `}
                                             >
                                                 {showWrongFeedback && isSelected && (
-                                                    <X className="absolute top-2 right-2 w-6 h-6 text-white" />
+                                                    <X className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 text-white" />
                                                 )}
                                                 {option}
                                             </button>
@@ -539,49 +613,9 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
                 </div>
 
-                {/* Leaderboard Sidebar (Fixed Right) */}
-                <div className="w-64 bg-black/30 border-l border-white/10 flex flex-col">
-                    <div className="p-3 border-b border-white/10 font-bold bg-black/20 flex items-center gap-2">
-                        <Trophy className="w-4 h-4 text-yellow-400" />
-                        Leaderboard
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                        {leaderboard.map((player, i) => (
-                            <div
-                                key={player.name}
-                                className={`
-                                    flex flex-col p-2 rounded 
-                                    ${player.name === userName ? 'bg-white/20 ring-1 ring-white/50' : 'bg-white/5'}
-                                    transition-all hover:bg-white/10
-                                `}
-                            >
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <span className={`
-                                            w-5 h-5 flex items-center justify-center rounded text-xs font-bold
-                                            ${i === 0 ? 'bg-yellow-400 text-black' :
-                                                i === 1 ? 'bg-gray-300 text-black' :
-                                                    i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-white/70'}
-                                        `}>
-                                            {i + 1}
-                                        </span>
-                                        <span className="truncate text-sm font-medium">{player.name}</span>
-                                    </div>
-                                    <span className="text-xs font-bold text-yellow-300">{player.totalScore}</span>
-                                </div>
-                                {/* Progress Bar */}
-                                <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-green-500 transition-all duration-500"
-                                        style={{ width: `${Math.min(100, (player.currentQuestionIndex / questions.length) * 100)}%` }}
-                                    />
-                                </div>
-                                <div className="text-[10px] text-right text-white/40 mt-0.5">
-                                    {Math.min(player.currentQuestionIndex, questions.length)} / {questions.length}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                {/* Leaderboard Sidebar (Fixed Right on Desktop, Toggle on Mobile) */}
+                <div className={`w-full lg:w-64 flex-shrink-0 ${activeTab === 'leaderboard' ? 'flex-1 custom-scrollbar' : 'hidden lg:flex'}`}>
+                    <LeaderboardPanel />
                 </div>
             </div>
         );
@@ -591,14 +625,14 @@ export default function QuizGame(props: QuizGameProps) {
     if (gameStatus === 'finished') {
         return (
             <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white p-4">
-                <div className="flex items-center justify-center gap-2 mb-4">
+                <div className="flex items-center justify-center gap-2 mb-4 flex-shrink-0">
                     <Trophy className="w-6 h-6 text-yellow-400" />
                     <span className="font-bold text-xl">Quiz дууслаа!</span>
                 </div>
 
                 {/* My Result */}
                 {myRank > 0 && (
-                    <div className="text-center mb-4 p-4 bg-white/10 rounded-xl">
+                    <div className="text-center mb-4 p-4 bg-white/10 rounded-xl flex-shrink-0">
                         <div className="text-4xl mb-2">
                             {myRank === 1 && '🥇'}
                             {myRank === 2 && '🥈'}
@@ -614,21 +648,21 @@ export default function QuizGame(props: QuizGameProps) {
                 )}
 
                 {/* Full Leaderboard */}
-                <div className="flex-1 overflow-y-auto space-y-2">
+                <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar touch-pan-y">
                     {leaderboard.map((player, i) => (
                         <div
                             key={player.name}
                             className={`flex items-center justify-between p-3 rounded-lg ${player.name === userName ? 'bg-yellow-500/30 ring-2 ring-yellow-400' : 'bg-white/10'}`}
                         >
                             <div className="flex items-center gap-3">
-                                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${i === 0 ? 'bg-yellow-400 text-black' : i === 1 ? 'bg-gray-300 text-black' : i === 2 ? 'bg-amber-600 text-white' : 'bg-white/20'}`}>
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${i === 0 ? 'bg-yellow-400 text-black' : i === 1 ? 'bg-gray-300 text-black' : i === 2 ? 'bg-amber-600 text-white' : 'bg-white/20'}`}>
                                     {i + 1}
                                 </span>
-                                <span className="font-medium">{player.name}</span>
+                                <span className="font-medium truncate max-w-[120px] sm:max-w-xs">{player.name}</span>
                             </div>
-                            <div className="text-right">
-                                <div className="font-bold">{player.totalScore} оноо</div>
-                                <div className="text-xs text-white/60">{player.correctCount}/{questions.length} зөв</div>
+                            <div className="text-right flex-shrink-0">
+                                <div className="font-bold">{player.totalScore}</div>
+                                <div className="text-xs text-white/60">{player.correctCount}/{questions.length}</div>
                             </div>
                         </div>
                     ))}
@@ -636,7 +670,7 @@ export default function QuizGame(props: QuizGameProps) {
 
                 {/* Teacher Reset Button */}
                 {isTeacher && (
-                    <Button onClick={handleReset} className="mt-4 bg-white/20 hover:bg-white/30">
+                    <Button onClick={handleReset} className="mt-4 bg-white/20 hover:bg-white/30 flex-shrink-0">
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Дахин тоглох
                     </Button>

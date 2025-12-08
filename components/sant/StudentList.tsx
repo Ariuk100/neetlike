@@ -112,9 +112,12 @@ export default function StudentList({ sessionId }: StudentListProps) {
         toast.success('Excel татагдлаа');
     };
 
+    // Responsive adjustments:
+    // - w-full to fill container (Sheet or Sidebar)
+    // - h-full to flex correctly
     return (
-        <div className="w-80 bg-white border-l flex flex-col h-full shadow-lg flex-shrink-0">
-            <div className="p-4 border-b flex items-center justify-between bg-stone-50">
+        <div className="w-full h-full flex flex-col bg-white border-l shadow-lg">
+            <div className="p-4 border-b flex items-center justify-between bg-stone-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-stone-600" />
                     <h3 className="font-semibold text-stone-700">Сурагчид ({students.length})</h3>
@@ -143,9 +146,6 @@ export default function StudentList({ sessionId }: StudentListProps) {
                                 ? `${formatTime(student.joinedAt)} `
                                 : `${formatTime(student.joinedAt)} - ${leftTime} `;
 
-                            // Debug log (optional, remove in prod but helpful now)
-                            // console.log('Rendering student:', student.name, student.status, timeText);
-
                             return (
                                 <div
                                     key={student.id}
@@ -153,7 +153,7 @@ export default function StudentList({ sessionId }: StudentListProps) {
                                 >
                                     <div className="flex flex-col overflow-hidden">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-stone-800 truncate" title={student.name}>{student.name}</span>
+                                            <span className="font-medium text-stone-800 truncate max-w-[120px]" title={student.name}>{student.name}</span>
                                             <span className="text-xs text-stone-500 flex-shrink-0">{student.class}</span>
                                         </div>
                                         <span className="text-[10px] text-stone-400 font-mono">

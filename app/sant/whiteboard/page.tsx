@@ -9,10 +9,17 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { toast } from 'sonner';
 import StudentList from '@/components/sant/StudentList';
 import WhiteboardCanvas from '@/components/sant/WhiteboardCanvas';
-import { Copy, LogOut } from 'lucide-react';
+import { Copy, LogOut, Users } from 'lucide-react';
 import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import EndSessionDialog from '@/components/sant/EndSessionDialog';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface WhiteboardData {
     classes: string[];
@@ -36,6 +43,7 @@ function WhiteboardContent() {
     const [totalPages, setTotalPages] = useState(1);     // NEW: Multi-page
     const [endDialogOpen, setEndDialogOpen] = useState(false);
     const [endingLoading, setEndingLoading] = useState(false);
+    const [isStudentListOpen, setIsStudentListOpen] = useState(false);
 
     // Fetch initial data
     useEffect(() => {
@@ -437,18 +445,34 @@ function WhiteboardContent() {
     return (
         <main className="flex flex-col h-screen bg-stone-100 overflow-hidden">
             {/* Header */}
-            <header className="flex-none h-14 bg-white border-b flex items-center justify-between px-4 z-10">
+            <header className="flex-none h-14 bg-white border-b flex items-center justify-between px-3 sm:px-4 z-10">
                 <div className="flex items-center gap-2">
-                    <Image src="/sant-watermark-white.png" width={32} height={32} className="object-contain" alt="Logo" />
-                    <span className="font-semibold text-stone-700">Сант</span>
-                    <span className="px-2 py-0.5 rounded bg-stone-100 text-xs font-mono text-stone-500 border border-stone-200">
+                    <Image src="/sant-watermark-white.png" width={28} height={28} className="object-contain sm:w-8 sm:h-8" alt="Logo" />
+                    <span className="font-semibold text-stone-700 hidden sm:inline">Сант</span>
+                    <span className="px-2 py-0.5 rounded bg-stone-100 text-xs font-mono text-stone-500 border border-stone-200 truncate max-w-[80px] sm:max-w-none">
                         {sessionId}
                     </span>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Mobile Student List Toggle */}
                     {isTeacher && (
-                        <Button variant="outline" size="sm" onClick={copyLink}>
+                        <div className="lg:hidden">
+                            <Sheet open={isStudentListOpen} onOpenChange={setIsStudentListOpen}>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <Users className="w-5 h-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side="right" className="p-0 w-80">
+                                    <StudentList sessionId={sessionId} />
+                                </SheetContent>
+                            </Sheet>
+                        </div>
+                    )}
+
+                    {isTeacher && (
+                        <Button variant="outline" size="sm" onClick={copyLink} className="hidden sm:flex">
                             <Copy className="w-4 h-4 mr-2" />
                             Link хуулах
                         </Button>
@@ -457,7 +481,7 @@ function WhiteboardContent() {
                         <>
                             <Button variant="destructive" size="sm" onClick={() => setEndDialogOpen(true)}>
                                 <LogOut className="w-4 h-4 mr-2" />
-                                Дуусгах
+                                <span className="hidden sm:inline">Дуусгах</span>
                             </Button>
                             <EndSessionDialog
                                 open={endDialogOpen}
@@ -477,7 +501,7 @@ function WhiteboardContent() {
             {/* Canvas Area - Flex Row Layout */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Whiteboard Container - takes remaining space after sidebar */}
-                <div className="flex-1 flex items-center justify-center bg-stone-100 overflow-hidden">
+                <div className="flex-1 flex items-center justify-center bg-stone-100 overflow-hidden relative">
                     <WhiteboardCanvas
                         sessionId={sessionId}
                         isTeacher={isTeacher}
@@ -491,9 +515,11 @@ function WhiteboardContent() {
                     />
                 </div>
 
-                {/* Student List Sidebar - Fixed width, no gap */}
+                {/* Student List Sidebar - Desktop Only */}
                 {isTeacher && (
-                    <StudentList sessionId={sessionId} />
+                    <div className="hidden lg:block w-80 border-l bg-white h-full flex-shrink-0">
+                        <StudentList sessionId={sessionId} />
+                    </div>
                 )}
             </div>
         </main>
