@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 const TEACHERS = [
     { code: 'TEACH01', name: 'Багш 1' },
     { code: 'TEACH02', name: 'Багш 2' },
-    { code: 'TEACH03', name: 'Багш 3' },
+    { code: 'ARIUNBOLD.G', name: 'Ариунbold.G' },
 ];
 
 export async function POST(req: Request) {

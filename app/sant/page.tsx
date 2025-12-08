@@ -10,12 +10,13 @@ import Practice from '@/components/sant/Practice';
 import Exam from '@/components/sant/Exam';
 
 // ==== Pyodide types ====
-type Pyodide = { runPythonAsync: (code: string) => Promise<unknown> };
-declare global {
-  interface Window {
-    loadPyodide: () => Promise<Pyodide>;
-  }
-}
+type Pyodide = {
+  runPythonAsync: (code: string) => Promise<unknown>;
+  runPython: (code: string) => unknown;
+};
+
+// Removed conflicting global declaration. Using casting instead.
+
 
 // ==== Types ====
 type Student = { class: string; code: string; name: string };
@@ -28,7 +29,7 @@ type RunResult = {
   details: Array<{ index: number; input: string; expected: string; actual: string }>;
 };
 
-// const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
+const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
 
 export default function SantPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -38,6 +39,7 @@ export default function SantPage() {
   const [current, setCurrent] = useState<Student | null>(null);
   // isLoading removed
   const [examStarted, setExamStarted] = useState(false);
+  const [pyodide, setPyodide] = useState<Pyodide | null>(null);
 
   const [problems, setProblems] = useState<Problem[]>([]);
   const [solutions, setSolutions] = useState<Record<string, string>>({});
@@ -229,6 +231,56 @@ export default function SantPage() {
     };
   }, [clearWarningTimer]); // `clearWarningTimer` нь `useCallback` тул тогтвортой
 
+  // Pyodide loading - Moved from startExam to top-level useEffect
+  useEffect(() => {
+    if (!examStarted) return;
+
+    let active = true;
+    (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((window as any).loadPyodide) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const p = await (window as any).loadPyodide();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (active) setPyodide(p as any as Pyodide);
+          return;
+        }
+        // script tag already added?
+        const existing = document.querySelector(`script[src="${PYODIDE_URL}"]`);
+        if (!existing) {
+          const script = document.createElement('script');
+          script.src = PYODIDE_URL;
+          script.onload = async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if ((window as any).loadPyodide) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const p = await (window as any).loadPyodide();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              if (active) setPyodide(p as any as Pyodide);
+            }
+          };
+          document.body.appendChild(script);
+        } else {
+          // wait for existing to load
+          const check = setInterval(async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if ((window as any).loadPyodide) {
+              clearInterval(check);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const p = await (window as any).loadPyodide();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              if (active) setPyodide(p as any as Pyodide);
+            }
+          }, 500);
+        }
+      } catch (e) {
+        console.error("Pyodide load error", e);
+      }
+    })();
+    return () => { active = false; };
+  }, [examStarted]);
+
   const grades = useMemo(() => {
     const set = new Set<string>();
     students.forEach((s) => set.add(s.class));
@@ -409,12 +461,7 @@ export default function SantPage() {
       toast.error('Бодлого ачаалж чадсангүй.');
     }
 
-    // Pyodide loading disabled
-    /*
-    useEffect(() => {
-      // ...
-    }, []);
-    */
+
 
     // 40 минутын таймер
     setTimeLeft(2400); // 40 минут
@@ -464,7 +511,7 @@ export default function SantPage() {
     if (!p) return;
     const userCode = (solutions[problemId] ?? '').trim();
     if (!userCode) return toast.error('Код хоосон байна.');
-    // if (!pyodide) return toast.error('Python интерпретер бэлэн биш байна.');
+    if (!pyodide) return toast.error('Python интерпретер бэлэн биш байна. Түр хүлээнэ үү.');
 
     setRunning((r) => ({ ...r, [problemId]: true }));
     toast.info('Код шалгаж байна...');
@@ -473,43 +520,77 @@ export default function SantPage() {
     const passedList: number[] = [];
     const details: Array<{ index: number; input: string; expected: string; actual: string }> = [];
 
+    // Capture stdout
+    const runCodeWithInput = async (code: string, input: string) => {
+      // Reset stdout
+      pyodide.runPython(`
+import sys
+import io
+sys.stdout = io.StringIO()
+`);
+      // Prepare input
+      // Simple overwrite:
+      const setupInput = `
+import sys
+import io
+
+input_str = """${input}"""
+input_iter = iter(input_str.split('\\n'))
+
+def input(prompt=None):
+    try:
+        return next(input_iter)
+    except StopIteration:
+        return ""
+
+sys.stdout = io.StringIO()
+`;
+
+      await pyodide.runPythonAsync(setupInput + "\n" + code);
+      const stdout = pyodide.runPython("sys.stdout.getvalue()");
+      return stdout;
+    };
+
+
     for (const [i, t] of p.tests.entries()) {
       try {
-        /*
-        const ret = await pyodide.runPythonAsync(pySrc);
-        const out = String(ret).trim();
-        */
-        const out = ""; // Mock output
-        if (out === t.expectedOutput.trim()) {
+        const out = await runCodeWithInput(userCode, t.input);
+        const actual = String(out).trim();
+        const expected = t.expectedOutput.trim();
+
+        if (actual === expected) {
           passed++;
           passedList.push(i + 1);
-          details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: out });
+          details.push({ index: i + 1, input: t.input, expected, actual });
         } else {
-          // унасан тестийг харуулах
+          details.push({ index: i + 1, input: t.input, expected, actual });
         }
-      } catch {
-        // алдаатай тестийг алгасах
+      } catch (err) {
+        // Run error
+        console.error(err);
+        details.push({ index: i + 1, input: t.input, expected: t.expectedOutput, actual: "Error: " + String(err) });
       }
     }
 
     const total = p.tests.length;
-    const score = Math.round((passed / total) * p.maxScore);
+    const score = total > 0 ? Math.round((passed / total) * p.maxScore) : 0;
 
-    // const payloadProblems ... removed
-    /*
     const nextScores = { ...scores, [problemId]: score };
-    // payloadProblems removed
     setScores(nextScores);
-    */
+
     setResults((prev) => ({
       ...prev,
       [problemId]: { passed, total, passedList, details },
     }));
     setRunning((r) => ({ ...r, [problemId]: false }));
-    toast.success(`✅ ${passed}/${total} тест амжилттай! Оноо: ${score}`);
 
-    toast.info("Local execution disabled temporarily.");
-  }, [problems, solutions]);
+    if (passed === total) {
+      toast.success(`✅ ${passed}/${total} тест амжилттай! Оноо: ${score}`);
+    } else {
+      toast.warning(`⚠️ ${passed}/${total} тест давлаа.`);
+    }
+
+  }, [problems, solutions, pyodide, scores]);
 
   // === scoreClass (useCallback-аар ороосон) ===
   /*

@@ -101,10 +101,19 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
         if (!containerRef.current) return;
 
         e.stopPropagation(); // Prevent canvas drawing
-        e.preventDefault();  // Prevent text selection/scrolling
 
-        // Capture pointer to ensure we get events even if cursor goes outside
-        (e.target as Element).setPointerCapture(e.pointerId);
+        // Fix: Allow interaction with inputs/textareas (e.g. for Quiz JSON input)
+        const target = e.target as HTMLElement;
+        const isInput = ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+
+        if (!isInput) {
+            e.preventDefault();  // Prevent text selection/scrolling ONLY for non-inputs
+            (e.target as Element).setPointerCapture(e.pointerId);
+        } else {
+            // For inputs, we must NOT preventDefault (so focus/paste works)
+            // And usually we don't want to start dragging the element immediately when clicking an input
+            return;
+        }
 
         const element = elements.find(el => el.id === elementId);
         if (!element) return;

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Trophy, Clock, HelpCircle, Check, X, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +27,9 @@ interface PlayerScore {
         responseTime: number;
         score: number;
     }[];
+    // NEW: Self-paced progress
+    currentQuestionIndex: number;
+    lastAnsweredAt: number; // Timestamp of last answer (or game start) to calc time for next Q
 }
 
 interface QuizGameElement {
@@ -34,8 +37,8 @@ interface QuizGameElement {
     type: string; // Flexible to work with ElementLayer
     questions?: Question[];
     gameStatus?: 'editing' | 'waiting' | 'playing' | 'showing_answer' | 'finished';
-    currentQuestionIndex?: number;
-    questionStartedAt?: number;
+    // Removed global currentQuestionIndex for gameplay (still might exist in old data)
+    questionStartedAt?: number; // Game started at
     players?: Record<string, PlayerScore>;
     defaultTimeLimit?: number;
 }
@@ -62,44 +65,35 @@ export default function QuizGame(props: QuizGameProps) {
     const { isTeacher, element, sessionId, userName } = props;
 
     // Local state
+    // Re-added timeLeft state that was accidentally removed
     const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME_LIMIT);
     const [jsonInput, setJsonInput] = useState('');
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
-    const answeredRef = useRef(false);
-    const answerStartTime = useRef<number>(0);
+    const [showWrongFeedback, setShowWrongFeedback] = useState(false); // Local feedback for wrong answer
 
     // Element data
     const questions = element.questions || [];
     const gameStatus = element.gameStatus || 'editing';
-    const currentQuestionIndex = element.currentQuestionIndex || 0;
-    const questionStartedAt = element.questionStartedAt || 0;
+    const gameStartedAt = element.questionStartedAt || 0; // "questionStartedAt" effectively becomes "gameStartedAt"
     const players = useMemo(() => element.players || {}, [element.players]);
     const defaultTimeLimit = element.defaultTimeLimit || DEFAULT_TIME_LIMIT;
-
-    const currentQuestion = questions[currentQuestionIndex];
-    const timeLimit = currentQuestion?.timeLimit || defaultTimeLimit;
 
     // My player ID
     const myId = userName.replace(/\s+/g, '_');
     const myScore = players[myId];
 
-    // Check if I already answered current question
-    const hasAnsweredCurrent = useMemo(() => {
-        if (!myScore || !currentQuestion) return false;
-        return myScore.answers.some(a => a.questionId === currentQuestion.id);
-    }, [myScore, currentQuestion]);
+    // My current progress
+    const myQuestionIndex = myScore?.currentQuestionIndex ?? 0;
+    const isFinished = myQuestionIndex >= questions.length;
+    const currentQuestion = !isFinished ? questions[myQuestionIndex] : null;
 
-    // Sorted leaderboard
-    const leaderboard = useMemo(() => {
-        return Object.values(players)
-            .sort((a, b) => b.totalScore - a.totalScore);
-    }, [players]);
+    // Time limit for CURRENT player's question
+    const timeLimit = currentQuestion?.timeLimit ?? defaultTimeLimit;
 
-    // My rank
-    const myRank = useMemo(() => {
-        const idx = leaderboard.findIndex(p => p.name === userName);
-        return idx >= 0 ? idx + 1 : 0;
-    }, [leaderboard, userName]);
+    // Timer logic depends on when *I* started this question
+    // If it's Q1, start time is game start.
+    // If Q>1, start time is lastAnsweredAt.
+    const myQuestionStartTime = myQuestionIndex === 0 ? gameStartedAt : (myScore?.lastAnsweredAt ?? gameStartedAt);
 
     // --------------------------------------------------------------------------------
     // Firestore update helper
@@ -113,57 +107,57 @@ export default function QuizGame(props: QuizGameProps) {
         }
     }, [sessionId, props.currentPage, element.id]);
 
-    // --------------------------------------------------------------------------------
-    // Timer
-    // --------------------------------------------------------------------------------
+
+    // Initial join/setup for player
     useEffect(() => {
-        if (gameStatus !== 'playing' || !questionStartedAt) {
-            setTimeLeft(timeLimit);
+        if (gameStatus === 'playing' && !myScore && !isTeacher) {
+            // Auto join if game is playing and I'm not in it
+            const newPlayer: PlayerScore = {
+                name: userName,
+                totalScore: 0,
+                correctCount: 0,
+                answers: [],
+                currentQuestionIndex: 0,
+                lastAnsweredAt: Date.now()
+            };
+            updateQuizElement({
+                [`players.${myId}`]: newPlayer
+            });
+        }
+    }, [gameStatus, myScore, isTeacher, userName, myId, updateQuizElement]);
+
+
+    // Timer Update
+    useEffect(() => {
+        if (gameStatus !== 'playing' || isFinished || isTeacher || !updateQuizElement) {
             return;
         }
 
-        // Reset answer state for new question
-        answeredRef.current = hasAnsweredCurrent;
-        answerStartTime.current = questionStartedAt;
-        setSelectedOption(null);
-
         const interval = setInterval(() => {
-            const elapsed = (Date.now() - questionStartedAt) / 1000;
+            if (showWrongFeedback) return;
+
+            const elapsed = (Date.now() - myQuestionStartTime) / 1000;
             const remaining = Math.max(0, timeLimit - elapsed);
             setTimeLeft(remaining);
-
-            // Time's up - auto advance (teacher only)
-            if (remaining <= 0 && isTeacher) {
-                clearInterval(interval);
-                updateQuizElement({ gameStatus: 'showing_answer' });
-            }
         }, 100);
 
         return () => clearInterval(interval);
-    }, [gameStatus, questionStartedAt, timeLimit, isTeacher, hasAnsweredCurrent, updateQuizElement]);
+    }, [gameStatus, isFinished, myQuestionStartTime, timeLimit, showWrongFeedback, isTeacher, updateQuizElement]);
 
-    // --------------------------------------------------------------------------------
-    // Show answer phase timer (2 seconds then next question)
-    // --------------------------------------------------------------------------------
-    useEffect(() => {
-        if (gameStatus !== 'showing_answer' || !isTeacher) return;
 
-        const timeout = setTimeout(() => {
-            if (currentQuestionIndex < questions.length - 1) {
-                // Next question
-                updateQuizElement({
-                    currentQuestionIndex: currentQuestionIndex + 1,
-                    questionStartedAt: Date.now(),
-                    gameStatus: 'playing'
-                });
-            } else {
-                // Game finished
-                updateQuizElement({ gameStatus: 'finished' });
-            }
-        }, 2000);
+    // Sorted leaderboard
+    const leaderboard = useMemo(() => {
+        return Object.values(players)
+            .sort((a, b) => b.totalScore - a.totalScore);
+    }, [players]);
 
-        return () => clearTimeout(timeout);
-    }, [gameStatus, isTeacher, currentQuestionIndex, questions.length, updateQuizElement]);
+    // My rank
+    const myRank = useMemo(() => {
+        const idx = leaderboard.findIndex(p => p.name === userName);
+        return idx >= 0 ? idx + 1 : 0;
+    }, [leaderboard, userName]);
+
+    // (Duplicate definition removed)
 
     // --------------------------------------------------------------------------------
     // Actions
@@ -176,19 +170,72 @@ export default function QuizGame(props: QuizGameProps) {
                 return;
             }
 
-            const formattedQuestions: Question[] = parsed.questions.map((q: { question: string; options: string[]; correctIndex: number; timeLimit?: number }, i: number) => ({
-                id: `q_${i}_${Date.now()}`,
-                question: q.question,
-                options: q.options,
-                correctIndex: q.correctIndex,
-                timeLimit: q.timeLimit || DEFAULT_TIME_LIMIT
-            }));
+            // Shuffle helper
+            const shuffleArray = (array: string[]) => {
+                const arr = [...array];
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            };
+
+            const formattedQuestions: Question[] = [];
+
+            // Validate each question structure
+            for (let i = 0; i < parsed.questions.length; i++) {
+                const q = parsed.questions[i];
+
+                // Allow string "correctAnswer" OR index "correctIndex" (backward compat if needed, but we focus on new req)
+                // User requirement: "correctAnswer" string.
+                if (!q.question || !Array.isArray(q.options)) {
+                    toast.error(`Асуулт ${i + 1} бүтэц буруу байна (question, options)`);
+                    return;
+                }
+
+                let finalOptions = q.options;
+                let finalCorrectIndex = -1;
+
+                if (typeof q.correctAnswer === 'string') {
+                    // Normalize check
+                    const answerText = q.correctAnswer.trim();
+                    if (!q.options.includes(answerText)) {
+                        toast.error(`"${q.question}" асуултын зөв хариулт сонголтууд дунд байхгүй байна:\n"${answerText}"`);
+                        return;
+                    }
+
+                    // SHUFFLE
+                    finalOptions = shuffleArray(q.options);
+                    finalCorrectIndex = finalOptions.indexOf(answerText);
+                } else if (typeof q.correctIndex === 'number') {
+                    // Fallback to old index way (but no shuffle to be safe unless we want to shuffle and track index map, which is complex. Let's just keep old behavior for index)
+                    if (q.correctIndex < 0 || q.correctIndex >= q.options.length) {
+                        toast.error(`"${q.question}" index буруу байна`);
+                        return;
+                    }
+                    finalCorrectIndex = q.correctIndex;
+                    // We don't shuffle if using strict index to avoid confusion unless explicitly requested.
+                    // User asked to shuffle. If user provides index, shuffling breaks it unless we know WHICH option was correct before shuffle.
+                    // Let's assume shuffling ONLY happens when correctAnswer string is provided.
+                } else {
+                    toast.error(`"${q.question}" зөв хариулт (correctAnswer) байхгүй байна`);
+                    return;
+                }
+
+                formattedQuestions.push({
+                    id: `q_${i}_${Date.now()}`,
+                    question: q.question,
+                    options: finalOptions,
+                    correctIndex: finalCorrectIndex,
+                    timeLimit: q.timeLimit || DEFAULT_TIME_LIMIT
+                });
+            }
 
             updateQuizElement({
                 questions: formattedQuestions,
                 gameStatus: 'waiting'
             });
-            toast.success(`${formattedQuestions.length} асуулт амжилттай нэмэгдлээ!`);
+            toast.success(`${formattedQuestions.length} асуулт амжилттай нэмэгдлээ! (Shuffled)`);
         } catch {
             toast.error('JSON формат буруу байна');
         }
@@ -202,67 +249,103 @@ export default function QuizGame(props: QuizGameProps) {
 
         await updateQuizElement({
             gameStatus: 'playing',
-            currentQuestionIndex: 0,
             questionStartedAt: Date.now(),
-            players: {}
+            players: {} // Reset players
         });
-        toast.success('Quiz эхэллээ!');
+        toast.success('Quiz эхэллээ! (Race Mode)');
     };
 
     const handleAnswer = async (optionIndex: number) => {
-        if (answeredRef.current || !currentQuestion || gameStatus !== 'playing') return;
+        // Prevent double clicks or answering if finished
+        if (showWrongFeedback || !currentQuestion || gameStatus !== 'playing') return;
 
-        answeredRef.current = true;
         setSelectedOption(optionIndex);
 
-        const responseTime = Date.now() - questionStartedAt;
+        const now = Date.now();
+        const elapsedRaw = now - myQuestionStartTime;
+        const responseTime = Math.min(Math.max(0, elapsedRaw), timeLimit * 1000);
+
         const isCorrect = optionIndex === currentQuestion.correctIndex;
 
-        // Calculate score (max 1000, decreases with time)
-        let score = 0;
-        if (isCorrect) {
-            const timeFraction = Math.max(0, 1 - (responseTime / (timeLimit * 1000)));
-            score = Math.round(1000 * timeFraction);
-        }
-
-        const newAnswer = {
-            questionId: currentQuestion.id,
-            answerIndex: optionIndex,
-            isCorrect,
-            responseTime,
-            score
-        };
-
+        // Current player state
         const currentPlayerData = players[myId] || {
             name: userName,
             totalScore: 0,
             correctCount: 0,
-            answers: []
+            answers: [],
+            currentQuestionIndex: 0,
+            lastAnsweredAt: now
         };
-
-        const updatedPlayer: PlayerScore = {
-            ...currentPlayerData,
-            totalScore: currentPlayerData.totalScore + score,
-            correctCount: currentPlayerData.correctCount + (isCorrect ? 1 : 0),
-            answers: [...currentPlayerData.answers, newAnswer]
-        };
-
-        await updateQuizElement({
-            [`players.${myId}`]: updatedPlayer
-        });
 
         if (isCorrect) {
-            toast.success(`Зөв! +${score} оноо`);
+            // --- CORRECT ANSWER ---
+            // Calculate score: Max 1000, decays over time
+            const ratio = responseTime / (timeLimit * 1000);
+            const timeFactor = 1 - (ratio / 2); // 1.0 to 0.5
+            const earnedScore = Math.round(1000 * timeFactor);
+
+            const newAnswer = {
+                questionId: currentQuestion.id,
+                answerIndex: optionIndex,
+                isCorrect: true,
+                responseTime,
+                score: earnedScore
+            };
+
+            const updatedPlayer: PlayerScore = {
+                ...currentPlayerData,
+                totalScore: currentPlayerData.totalScore + earnedScore,
+                correctCount: currentPlayerData.correctCount + 1,
+                answers: [...currentPlayerData.answers, newAnswer],
+                currentQuestionIndex: currentPlayerData.currentQuestionIndex + 1, // Advance!
+                lastAnsweredAt: now // Reset timer for next Q
+            };
+
+            await updateQuizElement({
+                [`players.${myId}`]: updatedPlayer
+            });
+
+            toast.success(`Зөв! +${earnedScore} оноо`);
+            setSelectedOption(null); // Reset selection for next Q
         } else {
-            toast.error('Буруу!');
+            // --- WRONG ANSWER ---
+            // Penalty: -200 points
+            // Do NOT advance index.
+            const penalty = 200;
+            const newScore = currentPlayerData.totalScore - penalty;
+
+            const updatedPlayer: PlayerScore = {
+                ...currentPlayerData,
+                totalScore: newScore,
+                // Do not add to "answers" array unless we want to track failed attempts history? 
+                // Maintaining simple history: maybe just deduct score. 
+                // Let's NOT update lastAnsweredAt so timer keeps running? Or reset it? 
+                // Usually in race mode, timer just keeps ticking for that question until solved.
+            };
+
+            await updateQuizElement({
+                [`players.${myId}`]: updatedPlayer
+            });
+
+            // Local UI feedback
+            setShowWrongFeedback(true);
+            toast.error(`Буруу! -${penalty} оноо`);
+
+            // Allow retry after short delay
+            setTimeout(() => {
+                setShowWrongFeedback(false);
+                setSelectedOption(null);
+            }, 1000);
         }
     };
+
+    // Teacher next question action (REMOVED for self-paced, keeping for legacy data cleanup if needed or just empty)
+    // const handleNextQuestion = async () => { ... }
 
     const handleReset = async () => {
         await updateQuizElement({
             gameStatus: 'editing',
             questions: [],
-            currentQuestionIndex: 0,
             players: {},
             questionStartedAt: 0
         });
@@ -290,8 +373,9 @@ export default function QuizGame(props: QuizGameProps) {
   "questions": [
     {
       "question": "Асуулт текст?",
-      "options": ["A", "B", "C", "D"],
-      "correctIndex": 0
+      "options": ["Paris", "London", "Berlin", "Tokyo"],
+      "correctAnswer": "Paris",
+      "timeLimit": 10
     }
   ]
 }`}
@@ -344,86 +428,157 @@ export default function QuizGame(props: QuizGameProps) {
         );
     }
 
-    // Playing or Showing Answer mode
-    if ((gameStatus === 'playing' || gameStatus === 'showing_answer') && currentQuestion) {
-        const isShowingAnswer = gameStatus === 'showing_answer';
+    // Playing mode (includes showing "Finished" state for individual player)
+    if (gameStatus === 'playing') {
 
         return (
-            <div className="flex flex-col w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2 bg-black/20">
-                    <div className="flex items-center gap-2">
-                        <HelpCircle className="w-4 h-4 text-yellow-400" />
-                        <span className="font-bold text-sm">Quiz</span>
+            <div className="flex flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white overflow-hidden">
+                {/* Main Game Area (70-75%) */}
+                <div className="flex-1 flex flex-col relative border-r border-white/10">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-black/20">
+                        <div className="flex items-center gap-2">
+                            <HelpCircle className="w-5 h-5 text-yellow-400" />
+                            <span className="font-bold">Quiz Race</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {!isFinished && !isTeacher && (
+                                <>
+                                    <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${timeLeft < 2 ? 'bg-red-500 animate-pulse' : 'bg-white/20'}`}>
+                                        <Clock className="w-4 h-4" />
+                                        <span className="font-mono font-bold">
+                                            {timeLeft.toFixed(1)}s
+                                        </span>
+                                    </div>
+                                    <div className="text-sm bg-white/20 px-3 py-1 rounded-full">
+                                        Q: {Math.min(myQuestionIndex + 1, questions.length)}/{questions.length}
+                                    </div>
+                                </>
+                            )}
+                            {isTeacher && (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        onClick={handleReset}
+                                        variant="destructive"
+                                        size="sm"
+                                        className="h-7 text-xs px-2 hover:bg-red-600"
+                                    >
+                                        <RotateCcw className="w-3 h-3 mr-1" />
+                                        Дуусгах / Шинэ
+                                    </Button>
+                                    <div className="bg-white/20 text-white h-7 px-3 flex items-center rounded text-xs pointer-events-none">
+                                        Live View
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${timeLeft < 2 ? 'bg-red-500 animate-pulse' : 'bg-white/20'}`}>
-                            <Clock className="w-4 h-4" />
-                            <span className="font-mono font-bold">{timeLeft.toFixed(1)}s</span>
-                        </div>
-                        <div className="text-sm bg-white/20 px-3 py-1 rounded-full">
-                            {currentQuestionIndex + 1}/{questions.length}
-                        </div>
+                    {/* Content Area */}
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
+                        {isTeacher ? (
+                            <div className="text-center opacity-70">
+                                <div className="text-6xl mb-4">👀</div>
+                                <div className="text-xl">Сурагчдын явцыг баруун талын самбараас харна уу.</div>
+                            </div>
+                        ) : isFinished ? (
+                            <div className="text-center animate-zoom-in">
+                                <div className="text-6xl mb-4">🏆</div>
+                                <h2 className="text-3xl font-bold mb-2">Баяр хүргэе!</h2>
+                                <p className="text-xl opacity-80 mb-4">Та бүх асуултанд хариуллаа.</p>
+                                <div className="bg-white/10 p-4 rounded-xl inline-block min-w-[200px]">
+                                    <div className="text-sm uppercase tracking-wider opacity-60">Нийт оноо</div>
+                                    <div className="text-4xl font-bold text-yellow-400">{myScore?.totalScore || 0}</div>
+                                </div>
+                            </div>
+                        ) : currentQuestion ? (
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-center leading-relaxed">
+                                    {currentQuestion.question}
+                                </h2>
+
+                                <div className="grid grid-cols-2 gap-4 w-full">
+                                    {currentQuestion.options.map((option, idx) => {
+                                        const colors = OPTION_COLORS[idx];
+                                        const isSelected = selectedOption === idx;
+
+                                        // Feedback styles
+                                        let btnStyle = `${colors.bg} ${colors.hover} ${colors.text}`;
+                                        if (showWrongFeedback && isSelected) {
+                                            btnStyle = 'bg-red-600 animate-shake ring-4 ring-red-400';
+                                        }
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleAnswer(idx)}
+                                                disabled={selectedOption !== null} // Disable while processing
+                                                className={`
+                                                    ${btnStyle} 
+                                                    relative h-24 sm:h-32 rounded-xl p-4 text-xl font-bold 
+                                                    transition-transform active:scale-95 shadow-lg
+                                                    flex items-center justify-center text-center
+                                                    disabled:opacity-80 disabled:cursor-not-allowed
+                                                `}
+                                            >
+                                                {showWrongFeedback && isSelected && (
+                                                    <X className="absolute top-2 right-2 w-6 h-6 text-white" />
+                                                )}
+                                                {option}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center">
+                                <div className="animate-spin text-4xl mb-2">⏳</div>
+                                <div>Ачаалж байна...</div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Question */}
-                <div className="px-4 py-6 text-center">
-                    <h2 className="text-xl sm:text-2xl font-bold">{currentQuestion.question}</h2>
-                </div>
-
-                {/* Options */}
-                <div className="flex-1 grid grid-cols-2 gap-3 px-4 pb-4">
-                    {currentQuestion.options.map((option, idx) => {
-                        const colors = OPTION_COLORS[idx];
-                        const isCorrect = idx === currentQuestion.correctIndex;
-                        const isSelected = selectedOption === idx;
-
-                        let buttonClass = `${colors.bg} ${colors.hover} ${colors.text}`;
-                        if (isShowingAnswer) {
-                            if (isCorrect) {
-                                buttonClass = 'bg-green-500 ring-4 ring-green-300';
-                            } else if (isSelected && !isCorrect) {
-                                buttonClass = 'bg-red-800 opacity-50';
-                            } else {
-                                buttonClass = `${colors.bg} opacity-30`;
-                            }
-                        } else if (isSelected) {
-                            buttonClass = `${colors.bg} ring-4 ring-white`;
-                        }
-
-                        return (
-                            <button
-                                key={idx}
-                                onClick={() => handleAnswer(idx)}
-                                disabled={hasAnsweredCurrent || isShowingAnswer}
-                                className={`${buttonClass} rounded-xl p-4 text-lg font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed`}
-                            >
-                                {isShowingAnswer && isCorrect && <Check className="w-6 h-6" />}
-                                {isShowingAnswer && isSelected && !isCorrect && <X className="w-6 h-6" />}
-                                {option}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Leaderboard Sidebar */}
-                <div className="bg-black/30 px-4 py-2 max-h-32 overflow-y-auto">
-                    <div className="text-xs font-bold uppercase text-white/60 mb-1">Leaderboard</div>
-                    <div className="space-y-1">
-                        {leaderboard.slice(0, 5).map((player, i) => (
+                {/* Leaderboard Sidebar (Fixed Right) */}
+                <div className="w-64 bg-black/30 border-l border-white/10 flex flex-col">
+                    <div className="p-3 border-b border-white/10 font-bold bg-black/20 flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-yellow-400" />
+                        Leaderboard
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                        {leaderboard.map((player, i) => (
                             <div
                                 key={player.name}
-                                className={`flex items-center justify-between text-sm ${player.name === userName ? 'bg-white/20 rounded px-2' : ''}`}
+                                className={`
+                                    flex flex-col p-2 rounded 
+                                    ${player.name === userName ? 'bg-white/20 ring-1 ring-white/50' : 'bg-white/5'}
+                                    transition-all hover:bg-white/10
+                                `}
                             >
-                                <div className="flex items-center gap-2">
-                                    <span className={`w-5 text-center ${i === 0 ? 'text-yellow-400 font-bold' : 'text-white/60'}`}>
-                                        {i + 1}
-                                    </span>
-                                    <span className="truncate max-w-[100px]">{player.name}</span>
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <span className={`
+                                            w-5 h-5 flex items-center justify-center rounded text-xs font-bold
+                                            ${i === 0 ? 'bg-yellow-400 text-black' :
+                                                i === 1 ? 'bg-gray-300 text-black' :
+                                                    i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-white/70'}
+                                        `}>
+                                            {i + 1}
+                                        </span>
+                                        <span className="truncate text-sm font-medium">{player.name}</span>
+                                    </div>
+                                    <span className="text-xs font-bold text-yellow-300">{player.totalScore}</span>
                                 </div>
-                                <span className="font-mono font-bold">{player.totalScore}</span>
+                                {/* Progress Bar */}
+                                <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-green-500 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, (player.currentQuestionIndex / questions.length) * 100)}%` }}
+                                    />
+                                </div>
+                                <div className="text-[10px] text-right text-white/40 mt-0.5">
+                                    {Math.min(player.currentQuestionIndex, questions.length)} / {questions.length}
+                                </div>
                             </div>
                         ))}
                     </div>
