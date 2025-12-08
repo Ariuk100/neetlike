@@ -520,10 +520,10 @@ export default function QuizGame(props: QuizGameProps) {
         );
 
         return (
-            <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white overflow-hidden">
+            <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white">
 
                 {/* Mobile Tab Switcher */}
-                <div className="lg:hidden flex border-b border-white/10 bg-black/20">
+                <div className="lg:hidden flex border-b border-white/10 bg-black/20 flex-shrink-0">
                     <button
                         onClick={() => setActiveTab('game')}
                         className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'game' ? 'bg-white/10 text-white' : 'text-white/50'}`}
@@ -539,9 +539,9 @@ export default function QuizGame(props: QuizGameProps) {
                 </div>
 
                 {/* Main Game Area (Visible if Desktop OR ActiveTab is Game) */}
-                <div className={`flex-1 flex flex-col relative ${activeTab === 'game' ? 'flex' : 'hidden lg:flex'}`}>
+                <div className={`flex-1 flex flex-col min-h-0 relative ${activeTab === 'game' ? 'flex' : 'hidden lg:flex'}`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-3 bg-black/20">
+                    <div className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-3 bg-black/20 flex-shrink-0">
                         <div className="flex items-center gap-2">
                             {/* Only show title on desktop to save space on mobile */}
                             <span className="font-bold hidden sm:inline">Quiz Race</span>
@@ -581,7 +581,7 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-4 relative overflow-y-auto touch-pan-y">
+                    <div className="flex-1 flex flex-col items-center justify-start p-1 sm:p-4 relative overflow-y-auto overflow-x-hidden touch-pan-y">
                         {isTeacher ? (
                             <div className="text-center opacity-70">
                                 <div className="text-4xl sm:text-6xl mb-4">👀</div>
@@ -598,8 +598,8 @@ export default function QuizGame(props: QuizGameProps) {
                                 </div>
                             </div>
                         ) : currentQuestion ? (
-                            <div className="w-full max-w-3xl flex flex-col items-center gap-1 sm:gap-6 pt-1 pb-2">
-                                <h2 className="text-sm sm:text-3xl font-bold text-center leading-tight px-2 mb-1">
+                            <div className="w-full max-w-3xl flex flex-col items-center gap-1 sm:gap-6 pt-1 pb-2 max-h-full">
+                                <h2 className="text-xs sm:text-3xl font-bold text-center leading-tight px-2 mb-0.5">
                                     {currentQuestion.question}
                                 </h2>
 
@@ -622,12 +622,12 @@ export default function QuizGame(props: QuizGameProps) {
                                                 disabled={selectedOption !== null}
                                                 className={`
                                                     ${btnStyle} 
-                                                    relative rounded-lg sm:rounded-xl p-1.5 sm:p-4 font-bold 
+                                                    relative rounded-lg sm:rounded-xl px-1 py-3 sm:p-4 font-bold 
                                                     transition-transform active:scale-95 shadow-lg
                                                     flex items-center justify-center text-center
                                                     disabled:opacity-80 disabled:cursor-not-allowed
                                                     break-words leading-tight
-                                                    min-h-[50px] sm:h-32
+                                                    h-auto sm:h-32
                                                     text-[10px] sm:text-xl
                                                 `}
                                             >
