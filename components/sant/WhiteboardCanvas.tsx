@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Trash2, Eraser, Pen, Lock, Unlock, ChevronLeft, ChevronRight, Plus, ImageIcon, Type, Video, MousePointer, FolderOpen, FileUp, Globe, FileMinus, Target, Trophy, HelpCircle } from 'lucide-react';
+import { Trash2, Eraser, Pen, Lock, Unlock, ChevronLeft, ChevronRight, Plus, ImageIcon, Type, Video, MousePointer, FolderOpen, FileUp, Globe, FileMinus, Target, Trophy } from 'lucide-react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -167,6 +167,7 @@ export default function WhiteboardCanvas({
         const gameEl = el as { gameStatus?: string; type: string };
         if (el.type === 'photon_game' && gameEl.gameStatus === 'racing') return true;
         if (el.type === 'quiz_game' && gameEl.gameStatus === 'playing') return true;
+        if (el.type === 'word_scramble' && gameEl.gameStatus === 'playing') return true;
         return false;
     });
 
@@ -611,6 +612,27 @@ export default function WhiteboardCanvas({
         }
     };
 
+    const createWordScrambleElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'word_scramble',
+                x: 20,
+                y: 15,
+                width: 60,
+                height: 70,
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
+
+            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("Word Scramble нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating word scramble:", error);
+            toast.error("Word Scramble нэмэхэд алдаа гарлаа");
+        }
+    };
+
     const createIframeElement = async (url: string) => {
         if (!url.trim()) return;
 
@@ -632,6 +654,27 @@ export default function WhiteboardCanvas({
         } catch (error) {
             console.error("Error creating simulation:", error);
             toast.error("Simulation нэмэхэд алдаа гарлаа");
+        }
+    };
+
+    const createOpticsGameElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'optics_game',
+                x: 10,
+                y: 10,
+                width: 80,
+                height: 80,
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
+
+            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("Optics Challenge нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating optics game:", error);
+            toast.error("Optics Game нэмэхэд алдаа гарлаа");
         }
     };
 
@@ -844,13 +887,17 @@ export default function WhiteboardCanvas({
                                         <DropdownMenuContent>
                                             <DropdownMenuLabel>Тоглоом сонгох</DropdownMenuLabel>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={createPhotonGameElement}>
-                                                <Trophy className="mr-2 h-4 w-4" />
-                                                <span>Photon Race</span>
+                                            <DropdownMenuItem onSelect={createPhotonGameElement}>
+                                                <div className="flex items-center">☀️ Photon Race</div>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={createQuizGameElement}>
-                                                <HelpCircle className="mr-2 h-4 w-4" />
-                                                <span>Quiz Game</span>
+                                            <DropdownMenuItem onSelect={createQuizGameElement}>
+                                                <div className="flex items-center">❓ Quiz Game</div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createWordScrambleElement}>
+                                                <div className="flex items-center">🔤 Word Scramble</div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createOpticsGameElement}>
+                                                <div className="flex items-center">🔦 Optics Challenge</div>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>

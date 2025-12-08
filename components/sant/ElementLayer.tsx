@@ -8,10 +8,12 @@ import TextFormatToolbar, { TextStyle } from './TextFormatToolbar';
 import InputDialog from './InputDialog';
 import PhotonRaceGame from './PhotonRaceGame';
 import QuizGame from './QuizGame';
+import WordScramble from './WordScramble';
+import OpticsGame from './OpticsGame';
 
 export interface WhiteboardElement {
     id: string;
-    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game';
+    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game' | 'word_scramble' | 'optics_game';
     x: number;      // Percentage (0-100)
     y: number;      // Percentage (0-100)
     width: number;  // Percentage (0-100)
@@ -346,7 +348,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                     <div
                         key={element.id}
                         className={`absolute 
-                            ${element.type !== 'quiz_game' ? 'touch-none select-none' : ''} 
+                            ${element.type !== 'quiz_game' && element.type !== 'word_scramble' ? 'touch-none select-none' : ''} 
                             ${getAnimationClass(element.animation)} 
                             ${isSelected ? 'ring-2 ring-blue-500' : ''}
                             ${isInteracting ? 'pointer-events-none z-50' : 'pointer-events-auto'}
@@ -446,6 +448,33 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                             </div>
                         )}
 
+                        {element.type === 'word_scramble' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <WordScramble
+                                    isTeacher={isTeacher}
+                                    element={element}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                />
+                                {!isInteracting && (
+                                    <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
+                                )}
+                            </div>
+                        )}
+
+                        {element.type === 'optics_game' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <OpticsGame
+                                    isTeacher={isTeacher}
+                                    element={element}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                />
+                            </div>
+                        )}
+
                         {/* Teacher Controls - Only when selected */}
                         {isSelected && !isInteracting && (
                             <>
@@ -467,8 +496,8 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     />
                                 )}
 
-                                {/* NEW: Video/Iframe Interaction Toggle */}
-                                {(element.type === 'video' || element.type === 'iframe') && (
+                                {/* NEW: Video/Iframe/Game Interaction Toggle */}
+                                {(element.type === 'video' || element.type === 'iframe' || element.type === 'word_scramble' || element.type === 'quiz_game' || element.type === 'photon_game' || element.type === 'optics_game') && (
                                     <button
                                         className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 z-50 shadow-md pointer-events-auto"
                                         onPointerDown={(e) => {
@@ -544,6 +573,6 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                 multiline
                 onSubmit={handleTextContentUpdate}
             />
-        </div>
+        </div >
     );
 }
