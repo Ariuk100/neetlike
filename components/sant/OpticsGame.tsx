@@ -1024,8 +1024,8 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
     return (
         <div className="flex flex-col w-full h-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl relative">
 
-            {/* 1. Level Selector Bar - Compressed for Mobile */}
-            <div className="bg-slate-800 p-1 sm:p-2 flex items-center justify-between border-b border-slate-700">
+            {/* 1. Level Selector Bar - Hidden on mobile */}
+            <div className="bg-slate-800 p-1 sm:p-2 border-b border-slate-700 hidden md:flex items-center justify-between">
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide px-1 sm:px-2">
                     {levels.map(l => {
                         const isUnlocked = l.id <= maxUnlockedLevel;
@@ -1085,7 +1085,8 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                         <span className="hidden md:inline ml-1 text-xs">{isLaserOn ? 'ON' : 'OFF'}</span>
                     </button>
 
-                    <div className="font-mono text-xs sm:text-lg text-yellow-500 bg-black/30 px-1 sm:px-2 py-0.5 sm:py-1 rounded border border-yellow-500/20 tabular-nums min-w-[40px] sm:min-w-[70px] text-center">
+                    {/* Timer - Hidden on small mobile */}
+                    <div className="font-mono text-xs sm:text-lg text-yellow-500 bg-black/30 px-1 sm:px-2 py-0.5 sm:py-1 rounded border border-yellow-500/20 tabular-nums min-w-[40px] sm:min-w-[70px] text-center hidden sm:block">
                         {(elapsedTime / 1000).toFixed(1)}s
                     </div>
 
@@ -1226,32 +1227,32 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                 </div>
 
                 {/* 3. Global Toolbar - Right side on mobile, Bottom on desktop */}
-                <div className="bg-slate-800 p-2 md:p-3 border-l md:border-l-0 md:border-t border-slate-700 flex flex-col md:flex-row justify-center items-center gap-2 md:gap-4 z-20">
+                <div className="bg-slate-800 p-1 md:p-3 border-l md:border-l-0 md:border-t border-slate-700 flex flex-col md:flex-row justify-center items-center gap-1 md:gap-4 z-20 w-12 md:w-auto">
                     <p className="text-white text-xs font-medium self-center hidden lg:block rotate-0">Багаж:</p>
                     <button
                         onClick={() => addTool('mirror')}
-                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-10 h-16 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
                         title="Толь"
                     >
-                        <div className="w-6 h-0.5 sm:w-7 sm:h-1 bg-slate-300 rotate-[-45deg] mb-0.5 sm:mb-1 group-hover:shadow-[0_0_10px_white]"></div>
-                        <span className="text-[8px] sm:text-[10px]">Толь</span>
+                        <div className="w-5 h-0.5 md:w-7 md:h-1 bg-slate-300 rotate-[-45deg] mb-0.5 group-hover:shadow-[0_0_10px_white]"></div>
+                        <span className="text-[7px] md:text-[10px]">Толь</span>
                     </button>
                     <button
                         onClick={() => addTool('block')}
-                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-10 h-16 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
                         title="Шил"
                     >
-                        <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-400/30 border border-blue-400 mb-0.5 sm:mb-1 group-hover:shadow-[0_0_15px_blue]"></div>
-                        <span className="text-[8px] sm:text-[10px]">Шил</span>
+                        <div className="w-4 h-4 md:w-6 md:h-6 bg-blue-400/30 border border-blue-400 mb-0.5 group-hover:shadow-[0_0_15px_blue]"></div>
+                        <span className="text-[7px] md:text-[10px]">Шил</span>
                     </button>
                     <button
                         onClick={() => addTool('lens')}
-                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-10 h-16 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
                         title="Линз"
                     >
                         {/* Icon for Lens: Eye shape */}
-                        <div className="w-6 h-3 sm:w-7 sm:h-4 rounded-[100%] bg-blue-400/30 border border-blue-400 mb-0.5 sm:mb-1 group-hover:shadow-[0_0_15px_blue] transform rotate-90"></div>
-                        <span className="text-[8px] sm:text-[10px]">Линз</span>
+                        <div className="w-5 h-2.5 md:w-7 md:h-4 rounded-[100%] bg-blue-400/30 border border-blue-400 mb-0.5 group-hover:shadow-[0_0_15px_blue] transform rotate-90"></div>
+                        <span className="text-[7px] md:text-[10px]">Линз</span>
                     </button>
                 </div>
             </div>
