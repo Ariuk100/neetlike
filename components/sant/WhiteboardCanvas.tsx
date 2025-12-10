@@ -168,6 +168,7 @@ export default function WhiteboardCanvas({
         if (el.type === 'photon_game' && gameEl.gameStatus === 'racing') return true;
         if (el.type === 'quiz_game' && gameEl.gameStatus === 'playing') return true;
         if (el.type === 'word_scramble' && gameEl.gameStatus === 'playing') return true;
+        if (el.type === 'optics_game') return true; // Always lock for Optics Game as it is interactive
         return false;
     });
 
