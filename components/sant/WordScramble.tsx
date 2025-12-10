@@ -32,6 +32,8 @@ interface WordScrambleElement {
     gameStatus?: 'editing' | 'waiting' | 'playing' | 'finished';
     players?: Record<string, PlayerProgress>;
     gameStartedAt?: Timestamp | number;
+    language?: 'mongolian' | 'english';
+    maxWrongGuesses?: number;
 }
 
 interface WordScrambleProps {
@@ -42,7 +44,7 @@ interface WordScrambleProps {
     userName: string;
 }
 
-const MAX_WRONG_GUESSES = 8;
+const DEFAULT_MAX_WRONG_GUESSES = 8;
 
 // Hangman SVG stages
 const HangmanStage = ({ stage }: { stage: number }) => {
@@ -100,6 +102,8 @@ export default function WordScramble(props: WordScrambleProps) {
     const words = element.words || [];
     const gameStatus = element.gameStatus || 'editing';
     const players = useMemo(() => element.players || {}, [element.players]);
+    const language = element.language || 'mongolian';
+    const maxWrongGuesses = element.maxWrongGuesses || DEFAULT_MAX_WRONG_GUESSES;
 
     const myId = userName.replace(/\s+/g, '_');
     const myProgress = players[myId];
@@ -146,16 +150,18 @@ export default function WordScramble(props: WordScrambleProps) {
     // Display word with guessed letters
     const displayWord = useMemo(() => {
         if (!currentWord) return '';
-        return currentWord.word.split('').map(letter =>
-            guessedLetters.includes(letter.toUpperCase()) ? letter : '_'
-        ).join(' ');
+        return currentWord.word.split('').map(letter => {
+            const upperLetter = letter.toUpperCase();
+            return guessedLetters.some(gl => gl.toUpperCase() === upperLetter) ? letter : '_';
+        }).join(' ');
     }, [currentWord, guessedLetters]);
 
     const isWordComplete = useMemo(() => {
         if (!currentWord) return false;
-        return currentWord.word.split('').every(letter =>
-            guessedLetters.includes(letter.toUpperCase())
-        );
+        return currentWord.word.split('').every(letter => {
+            const upperLetter = letter.toUpperCase();
+            return guessedLetters.some(gl => gl.toUpperCase() === upperLetter);
+        });
     }, [currentWord, guessedLetters]);
 
     // Firestore update
@@ -182,7 +188,7 @@ export default function WordScramble(props: WordScrambleProps) {
                     throw new Error(`Үг ${i + 1}: word болон hint шаардлагатай`);
                 }
                 return {
-                    word: w.word.toUpperCase(),
+                    word: w.word.trim(),
                     hint: w.hint,
                     category: w.category || ''
                 };
@@ -234,7 +240,7 @@ export default function WordScramble(props: WordScrambleProps) {
 
     // Handle letter guess
     const handleGuess = async (letter: string) => {
-        if (!currentWord || isWordComplete || wrongGuesses >= MAX_WRONG_GUESSES) return;
+        if (!currentWord || isWordComplete || wrongGuesses >= maxWrongGuesses) return;
 
         const upperLetter = letter.toUpperCase();
         if (guessedLetters.includes(upperLetter)) {
@@ -243,7 +249,7 @@ export default function WordScramble(props: WordScrambleProps) {
         }
 
         const newGuessedLetters = [...guessedLetters, upperLetter];
-        const isCorrect = currentWord.word.includes(upperLetter);
+        const isCorrect = currentWord.word.toUpperCase().includes(upperLetter);
 
         setGuessStatus(isCorrect ? 'correct' : 'incorrect');
 
@@ -264,7 +270,7 @@ export default function WordScramble(props: WordScrambleProps) {
             updatedProgress.guessedLetters = [];
             updatedProgress.wrongGuesses = 0;
             toast.success('Зөв! Дараагийн үг...');
-        } else if (updatedProgress.wrongGuesses >= MAX_WRONG_GUESSES) {
+        } else if (updatedProgress.wrongGuesses >= maxWrongGuesses) {
             // Failed this word, move to next
             updatedProgress.currentWordIndex = currentWordIndex + 1;
             updatedProgress.guessedLetters = [];
@@ -304,23 +310,64 @@ export default function WordScramble(props: WordScrambleProps) {
         setJsonInput('');
     };
 
-    // Keyboard
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    // Keyboard - Both English and Mongolian alphabets
+    const englishAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const mongolianAlphabet = 'АБВГДЕЁЖЗИЙКЛМНОӨПРСТУҮФХЦЧШЩЪЫЬЭЮЯ'.split('');
+    const alphabet = language === 'mongolian' ? mongolianAlphabet : englishAlphabet;
+
+    // Handle language change
+    const handleLanguageChange = (newLanguage: 'mongolian' | 'english') => {
+        updateElement({ language: newLanguage });
+    };
 
     // Editing mode
     if (gameStatus === 'editing' && isTeacher) {
         return (
             <div className="flex flex-col w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 p-2 sm:p-4 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                    <Lightbulb className="w-5 h-5 text-yellow-400" />
-                    <span className="font-bold text-sm sm:text-base">Word Scramble - Үг оруулах</span>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Lightbulb className="w-5 h-5 text-yellow-400" />
+                        <span className="font-bold text-sm sm:text-base">Word Scramble - Үг оруулах</span>
+                    </div>
+                    <select
+                        value={language}
+                        onChange={(e) => handleLanguageChange(e.target.value as 'mongolian' | 'english')}
+                        className="bg-white/10 border border-white/20 text-white rounded px-2 py-1 text-xs sm:text-sm"
+                    >
+                        <option value="mongolian" className="bg-indigo-900">Монгол</option>
+                        <option value="english" className="bg-indigo-900">English</option>
+                    </select>
                 </div>
 
                 <div className="flex-1 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <label className="text-sm">Алдах эрх:</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={maxWrongGuesses}
+                            onChange={(e) => updateElement({ maxWrongGuesses: parseInt(e.target.value) || DEFAULT_MAX_WRONG_GUESSES })}
+                            className="bg-white/10 border border-white/20 text-white rounded px-3 py-1 w-20 text-sm"
+                        />
+                        <span className="text-xs text-white/60">(1-20)</span>
+                    </div>
                     <Textarea
                         value={jsonInput}
                         onChange={(e) => setJsonInput(e.target.value)}
-                        placeholder={`{
+                        placeholder={language === 'mongolian' ? `{
+  "words": [
+    {
+      "word": "ХУРДАТГАЛ",
+      "hint": "Acceleration",
+      "category": "Механик"
+    },
+    {
+      "word": "ХҮЧ",
+      "hint": "Force"
+    }
+  ]
+}` : `{
   "words": [
     {
       "word": "ACCELERATION",
@@ -473,7 +520,7 @@ export default function WordScramble(props: WordScrambleProps) {
 
                                 {/* Wrong guesses */}
                                 <div className="text-xs text-red-300">
-                                    Буруу: {wrongGuesses} / {MAX_WRONG_GUESSES}
+                                    Буруу: {wrongGuesses} / {maxWrongGuesses}
                                 </div>
 
                                 {/* Scrambled word */}
