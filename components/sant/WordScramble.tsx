@@ -135,51 +135,6 @@ export default function WordScramble(props: WordScrambleProps) {
         }
     }, [guessStatus]);
 
-    // Scramble word - Ensure it's not the same as original, preserve spaces
-    const scrambledWord = useMemo(() => {
-        if (!currentWord) return '';
-        const original = currentWord.word;
-        if (original.length <= 1) return original; // Can't scramble single letter
-
-        // If word contains spaces, scramble only the letters, keep spaces in place
-        if (original.includes(' ')) {
-            const words = original.split(' ');
-            const scrambledWords = words.map(word => {
-                if (word.length <= 1) return word;
-
-                let scrambled = '';
-                let attempts = 0;
-                do {
-                    const letters = word.split('');
-                    for (let i = letters.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [letters[i], letters[j]] = [letters[j], letters[i]];
-                    }
-                    scrambled = letters.join('');
-                    attempts++;
-                } while (scrambled === word && attempts < 10);
-
-                return scrambled;
-            });
-            return scrambledWords.join(' ');
-        }
-
-        // Single word - scramble normally
-        let scrambled = '';
-        let attempts = 0;
-
-        do {
-            const letters = original.split('');
-            for (let i = letters.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [letters[i], letters[j]] = [letters[j], letters[i]];
-            }
-            scrambled = letters.join('');
-            attempts++;
-        } while (scrambled === original && attempts < 10);
-
-        return scrambled;
-    }, [currentWordIndex]); // Changed from currentWord to currentWordIndex
 
     const guessedLetters = useMemo(() => myProgress?.guessedLetters ?? [], [myProgress?.guessedLetters]);
     const wrongGuesses = myProgress?.wrongGuesses ?? 0;
@@ -262,7 +217,7 @@ export default function WordScramble(props: WordScrambleProps) {
             }
             if (screen.orientation) {
                 try {
-                    // @ts-ignore
+                    // @ts-expect-error - orientation.lock is experimental API
                     await screen.orientation.lock('landscape');
                 } catch (err) {
                     console.log('Orientation lock error:', err);

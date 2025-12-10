@@ -238,7 +238,7 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
             }
             if (screen.orientation) {
                 try {
-                    // @ts-ignore
+                    // @ts-expect-error - orientation.lock is experimental API
                     await screen.orientation.lock('landscape');
                 } catch (err) {
                     console.log('Orientation lock error:', err);

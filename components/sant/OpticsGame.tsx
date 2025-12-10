@@ -114,7 +114,7 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                 // Lock to landscape orientation on mobile
                 if (screen.orientation) {
                     try {
-                        // @ts-ignore - orientation.lock is experimental but widely supported on mobile
+                        // @ts-expect-error - orientation.lock is experimental but widely supported on mobile
                         await screen.orientation.lock('landscape');
                     } catch (err) {
                         console.log('Orientation lock error:', err);
