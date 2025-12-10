@@ -224,6 +224,28 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     // --------------------------------------------------------------------------------
     const handleStartRace = async (e: React.MouseEvent) => {
         e.stopPropagation();
+
+        // Mobile fullscreen + landscape
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                try {
+                    await elem.requestFullscreen();
+                } catch (err) {
+                    console.log('Fullscreen error:', err);
+                }
+            }
+            if (screen.orientation) {
+                try {
+                    // @ts-ignore
+                    await screen.orientation.lock('landscape');
+                } catch (err) {
+                    console.log('Orientation lock error:', err);
+                }
+            }
+        }
+
         // Reset submission flag for all students when starting new race
         submittedRef.current = false;
         await updateGameElement({

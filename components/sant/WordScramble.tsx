@@ -249,6 +249,27 @@ export default function WordScramble(props: WordScrambleProps) {
             return;
         }
 
+        // Mobile fullscreen + landscape
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                try {
+                    await elem.requestFullscreen();
+                } catch (err) {
+                    console.log('Fullscreen error:', err);
+                }
+            }
+            if (screen.orientation) {
+                try {
+                    // @ts-ignore
+                    await screen.orientation.lock('landscape');
+                } catch (err) {
+                    console.log('Orientation lock error:', err);
+                }
+            }
+        }
+
         await updateElement({
             gameStatus: 'playing',
             gameStartedAt: serverTimestamp(),
@@ -546,8 +567,8 @@ export default function WordScramble(props: WordScrambleProps) {
 
                                 {/* Display word - shows underscores and revealed letters */}
                                 <div className={`text-3xl font-mono font-bold tracking-wider my-4 px-4 py-3 rounded-lg transition-colors duration-300 ${guessStatus === 'correct' ? 'bg-green-500/50 scale-105' :
-                                        guessStatus === 'incorrect' ? 'bg-red-500/50 animate-shake' :
-                                            'bg-white/10'
+                                    guessStatus === 'incorrect' ? 'bg-red-500/50 animate-shake' :
+                                        'bg-white/10'
                                     }`}>
                                     {displayWord}
                                 </div>

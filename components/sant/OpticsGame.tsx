@@ -97,6 +97,31 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
     // Teacher Global Start
     const handleGlobalStart = async () => {
         try {
+            // Check if mobile device (screen width < 768px)
+            const isMobile = window.innerWidth < 768;
+
+            if (isMobile) {
+                // Enter fullscreen on mobile devices
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    try {
+                        await elem.requestFullscreen();
+                    } catch (err) {
+                        console.log('Fullscreen error:', err);
+                    }
+                }
+
+                // Lock to landscape orientation on mobile
+                if (screen.orientation) {
+                    try {
+                        // @ts-ignore - orientation.lock is experimental but widely supported on mobile
+                        await screen.orientation.lock('landscape');
+                    } catch (err) {
+                        console.log('Orientation lock error:', err);
+                    }
+                }
+            }
+
             const elRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id);
             await updateDoc(elRef, { gameStatus: 'playing' });
             setIsPlaying(true);
