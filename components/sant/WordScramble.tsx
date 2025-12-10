@@ -46,8 +46,12 @@ interface WordScrambleProps {
 
 const DEFAULT_MAX_WRONG_GUESSES = 8;
 
-// Hangman SVG stages
-const HangmanStage = ({ stage }: { stage: number }) => {
+// Hangman SVG stages - scales to match maxWrongGuesses
+const HangmanStage = ({ wrongGuesses, maxWrongGuesses }: { wrongGuesses: number; maxWrongGuesses: number }) => {
+    // Normalize wrongGuesses to 8 stages
+    // If maxWrongGuesses = 5, then wrongGuess 1 = stage 1.6, wrongGuess 2 = stage 3.2, etc.
+    const normalizedStage = maxWrongGuesses > 0 ? (wrongGuesses / maxWrongGuesses) * 8 : 0;
+
     return (
         <svg width="80" height="80" viewBox="0 0 100 120" className="mx-auto">
             {/* Gallows */}
@@ -57,25 +61,25 @@ const HangmanStage = ({ stage }: { stage: number }) => {
             <line x1="60" y1="10" x2="60" y2="20" stroke="white" strokeWidth="2" />
 
             {/* Head */}
-            {stage >= 1 && <circle cx="60" cy="30" r="8" stroke="white" strokeWidth="2" fill="none" />}
+            {normalizedStage >= 1 && <circle cx="60" cy="30" r="8" stroke="white" strokeWidth="2" fill="none" />}
 
             {/* Body */}
-            {stage >= 2 && <line x1="60" y1="38" x2="60" y2="60" stroke="white" strokeWidth="2" />}
+            {normalizedStage >= 2 && <line x1="60" y1="38" x2="60" y2="60" stroke="white" strokeWidth="2" />}
 
             {/* Left arm */}
-            {stage >= 3 && <line x1="60" y1="45" x2="50" y2="50" stroke="white" strokeWidth="2" />}
+            {normalizedStage >= 3 && <line x1="60" y1="45" x2="50" y2="50" stroke="white" strokeWidth="2" />}
 
             {/* Right arm */}
-            {stage >= 4 && <line x1="60" y1="45" x2="70" y2="50" stroke="white" strokeWidth="2" />}
+            {normalizedStage >= 4 && <line x1="60" y1="45" x2="70" y2="50" stroke="white" strokeWidth="2" />}
 
             {/* Left leg */}
-            {stage >= 5 && <line x1="60" y1="60" x2="50" y2="75" stroke="white" strokeWidth="2" />}
+            {normalizedStage >= 5 && <line x1="60" y1="60" x2="50" y2="75" stroke="white" strokeWidth="2" />}
 
             {/* Right leg */}
-            {stage >= 6 && <line x1="60" y1="60" x2="70" y2="75" stroke="white" strokeWidth="2" />}
+            {normalizedStage >= 6 && <line x1="60" y1="60" x2="70" y2="75" stroke="white" strokeWidth="2" />}
 
             {/* Left eye (X) */}
-            {stage >= 7 && (
+            {normalizedStage >= 7 && (
                 <>
                     <line x1="57" y1="28" x2="59" y2="30" stroke="white" strokeWidth="1" />
                     <line x1="59" y1="28" x2="57" y2="30" stroke="white" strokeWidth="1" />
@@ -83,7 +87,7 @@ const HangmanStage = ({ stage }: { stage: number }) => {
             )}
 
             {/* Right eye (X) */}
-            {stage >= 8 && (
+            {normalizedStage >= 8 && (
                 <>
                     <line x1="61" y1="28" x2="63" y2="30" stroke="white" strokeWidth="1" />
                     <line x1="63" y1="28" x2="61" y2="30" stroke="white" strokeWidth="1" />
@@ -142,7 +146,7 @@ export default function WordScramble(props: WordScrambleProps) {
         } while (scrambled === original && attempts < 10);
 
         return scrambled;
-    }, [currentWord]);
+    }, [currentWordIndex]); // Changed from currentWord to currentWordIndex
 
     const guessedLetters = useMemo(() => myProgress?.guessedLetters ?? [], [myProgress?.guessedLetters]);
     const wrongGuesses = myProgress?.wrongGuesses ?? 0;
@@ -516,7 +520,7 @@ export default function WordScramble(props: WordScrambleProps) {
                         ) : currentWord ? (
                             <div className="w-full max-w-2xl flex flex-col items-center gap-2 pt-2">
                                 {/* Hangman */}
-                                <HangmanStage stage={wrongGuesses} />
+                                <HangmanStage wrongGuesses={wrongGuesses} maxWrongGuesses={maxWrongGuesses} />
 
                                 {/* Wrong guesses */}
                                 <div className="text-xs text-red-300">
