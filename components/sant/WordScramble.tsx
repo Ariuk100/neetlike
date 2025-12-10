@@ -106,7 +106,6 @@ export default function WordScramble(props: WordScrambleProps) {
     const words = element.words || [];
     const gameStatus = element.gameStatus || 'editing';
     const players = useMemo(() => element.players || {}, [element.players]);
-    const language = element.language || 'mongolian';
     const maxWrongGuesses = element.maxWrongGuesses || DEFAULT_MAX_WRONG_GUESSES;
 
     const myId = userName.replace(/\s+/g, '_');
@@ -115,6 +114,16 @@ export default function WordScramble(props: WordScrambleProps) {
     const currentWordIndex = myProgress?.currentWordIndex ?? 0;
     const isFinished = currentWordIndex >= words.length;
     const currentWord = !isFinished ? words[currentWordIndex] : null;
+
+    // Auto-detect language from current word (Cyrillic = Mongolian, Latin = English)
+    const detectLanguage = (word: string | null): 'mongolian' | 'english' => {
+        if (!word) return 'mongolian';
+        // Check if word contains Cyrillic characters
+        const cyrillicPattern = /[А-Яа-яЁёӨөҮү]/;
+        return cyrillicPattern.test(word) ? 'mongolian' : 'english';
+    };
+
+    const language = currentWord ? detectLanguage(currentWord.word) : 'mongolian';
 
     const [guessStatus, setGuessStatus] = useState<'correct' | 'incorrect' | null>(null);
 
@@ -319,28 +328,13 @@ export default function WordScramble(props: WordScrambleProps) {
     const mongolianAlphabet = 'АБВГДЕЁЖЗИЙКЛМНОӨПРСТУҮФХЦЧШЩЪЫЬЭЮЯ'.split('');
     const alphabet = language === 'mongolian' ? mongolianAlphabet : englishAlphabet;
 
-    // Handle language change
-    const handleLanguageChange = (newLanguage: 'mongolian' | 'english') => {
-        updateElement({ language: newLanguage });
-    };
-
     // Editing mode
     if (gameStatus === 'editing' && isTeacher) {
         return (
             <div className="flex flex-col w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 p-2 sm:p-4 text-white">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                        <Lightbulb className="w-5 h-5 text-yellow-400" />
-                        <span className="font-bold text-sm sm:text-base">Word Scramble - Үг оруулах</span>
-                    </div>
-                    <select
-                        value={language}
-                        onChange={(e) => handleLanguageChange(e.target.value as 'mongolian' | 'english')}
-                        className="bg-white/10 border border-white/20 text-white rounded px-2 py-1 text-xs sm:text-sm"
-                    >
-                        <option value="mongolian" className="bg-indigo-900">Монгол</option>
-                        <option value="english" className="bg-indigo-900">English</option>
-                    </select>
+                <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="w-5 h-5 text-yellow-400" />
+                    <span className="font-bold text-sm sm:text-base">Word Scramble - Үг оруулах</span>
                 </div>
 
                 <div className="flex-1 flex flex-col gap-3">
@@ -359,28 +353,21 @@ export default function WordScramble(props: WordScrambleProps) {
                     <Textarea
                         value={jsonInput}
                         onChange={(e) => setJsonInput(e.target.value)}
-                        placeholder={language === 'mongolian' ? `{
+                        placeholder={`{
   "words": [
     {
-      "word": "ХУРДАТГАЛ",
+      "word": "ХУРДАТГАЛ",  // Кирилл үсэг → Монгол keyboard
       "hint": "Acceleration",
       "category": "Механик"
     },
     {
-      "word": "ХҮЧ",
-      "hint": "Force"
-    }
-  ]
-}` : `{
-  "words": [
-    {
-      "word": "ACCELERATION",
+      "word": "ACCELERATION",  // Латин үсэг → Англи keyboard
       "hint": "Хурдатгал",
       "category": "Mechanics"
     },
     {
-      "word": "VELOCITY",
-      "hint": "Хурд"
+      "word": "ХҮЧ",
+      "hint": "Force"
     }
   ]
 }`}
