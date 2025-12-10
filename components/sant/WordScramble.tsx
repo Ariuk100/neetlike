@@ -135,12 +135,36 @@ export default function WordScramble(props: WordScrambleProps) {
         }
     }, [guessStatus]);
 
-    // Scramble word - Ensure it's not the same as original
+    // Scramble word - Ensure it's not the same as original, preserve spaces
     const scrambledWord = useMemo(() => {
         if (!currentWord) return '';
         const original = currentWord.word;
         if (original.length <= 1) return original; // Can't scramble single letter
 
+        // If word contains spaces, scramble only the letters, keep spaces in place
+        if (original.includes(' ')) {
+            const words = original.split(' ');
+            const scrambledWords = words.map(word => {
+                if (word.length <= 1) return word;
+
+                let scrambled = '';
+                let attempts = 0;
+                do {
+                    const letters = word.split('');
+                    for (let i = letters.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [letters[i], letters[j]] = [letters[j], letters[i]];
+                    }
+                    scrambled = letters.join('');
+                    attempts++;
+                } while (scrambled === word && attempts < 10);
+
+                return scrambled;
+            });
+            return scrambledWords.join(' ');
+        }
+
+        // Single word - scramble normally
         let scrambled = '';
         let attempts = 0;
 
@@ -514,51 +538,65 @@ export default function WordScramble(props: WordScrambleProps) {
                                     Буруу: {wrongGuesses} / {maxWrongGuesses}
                                 </div>
 
-                                {/* Scrambled word */}
-                                <div className={`text-lg font-bold px-4 py-2 rounded-lg transition-colors duration-300 ${guessStatus === 'correct' ? 'bg-green-500/50 scale-105' :
-                                    guessStatus === 'incorrect' ? 'bg-red-500/50 animate-shake' :
-                                        'bg-white/10'
-                                    }`}>
-                                    {scrambledWord}
-                                </div>
-
                                 {/* Hint */}
                                 <div className="text-xs text-yellow-300 flex items-center gap-1">
                                     <Lightbulb className="w-3 h-3" />
                                     {currentWord.hint}
                                 </div>
 
-                                {/* Display word */}
-                                <div className="text-2xl font-mono font-bold tracking-wider my-2">
+                                {/* Display word - shows underscores and revealed letters */}
+                                <div className={`text-3xl font-mono font-bold tracking-wider my-4 px-4 py-3 rounded-lg transition-colors duration-300 ${guessStatus === 'correct' ? 'bg-green-500/50 scale-105' :
+                                        guessStatus === 'incorrect' ? 'bg-red-500/50 animate-shake' :
+                                            'bg-white/10'
+                                    }`}>
                                     {displayWord}
                                 </div>
 
                                 {/* Keyboard */}
-                                <div className="w-full grid grid-cols-7 gap-1 px-2">
-                                    {alphabet.map(letter => {
-                                        const isGuessed = guessedLetters.includes(letter);
-                                        const isCorrect = currentWord.word.includes(letter);
+                                <div className="w-full flex flex-col gap-1 px-2">
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {alphabet.map(letter => {
+                                            const isGuessed = guessedLetters.includes(letter);
+                                            const isCorrect = currentWord.word.toUpperCase().includes(letter);
 
-                                        return (
-                                            <button
-                                                key={letter}
-                                                onClick={() => handleGuess(letter)}
-                                                disabled={isGuessed}
-                                                className={`
-                                                    h-8 text-xs font-bold rounded
-                                                    ${isGuessed
-                                                        ? isCorrect
-                                                            ? 'bg-green-500 text-white'
-                                                            : 'bg-red-500 text-white'
-                                                        : 'bg-white/20 hover:bg-white/30 active:scale-95'
-                                                    }
-                                                    disabled:opacity-50 disabled:cursor-not-allowed
-                                                `}
-                                            >
-                                                {letter}
-                                            </button>
-                                        );
-                                    })}
+                                            return (
+                                                <button
+                                                    key={letter}
+                                                    onClick={() => handleGuess(letter)}
+                                                    disabled={isGuessed}
+                                                    className={`
+                                                        h-8 text-xs font-bold rounded
+                                                        ${isGuessed
+                                                            ? isCorrect
+                                                                ? 'bg-green-500 text-white'
+                                                                : 'bg-red-500 text-white'
+                                                            : 'bg-white/20 hover:bg-white/30 active:scale-95'
+                                                        }
+                                                        disabled:opacity-50 disabled:cursor-not-allowed
+                                                    `}
+                                                >
+                                                    {letter}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {/* Space Button */}
+                                    <button
+                                        onClick={() => handleGuess(' ')}
+                                        disabled={guessedLetters.includes(' ')}
+                                        className={`
+                                            h-8 text-xs font-bold rounded
+                                            ${guessedLetters.includes(' ')
+                                                ? currentWord.word.includes(' ')
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-red-500 text-white'
+                                                : 'bg-white/20 hover:bg-white/30 active:scale-95'
+                                            }
+                                            disabled:opacity-50 disabled:cursor-not-allowed
+                                        `}
+                                    >
+                                        SPACE
+                                    </button>
                                 </div>
                             </div>
                         ) : (

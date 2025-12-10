@@ -999,9 +999,9 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
     return (
         <div className="flex flex-col w-full h-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl relative">
 
-            {/* 1. Level Selector Bar */}
-            <div className="bg-slate-800 p-2 flex items-center justify-between border-b border-slate-700">
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-2">
+            {/* 1. Level Selector Bar - Compressed for Mobile */}
+            <div className="bg-slate-800 p-1 sm:p-2 flex items-center justify-between border-b border-slate-700">
+                <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide px-1 sm:px-2">
                     {levels.map(l => {
                         const isUnlocked = l.id <= maxUnlockedLevel;
                         const isCurrent = l.id === level;
@@ -1016,7 +1016,7 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                                 key={l.id}
                                 onClick={() => handleSelectLevel(l.id)}
                                 disabled={!isUnlocked}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all min-w-[32px] ${bgClass}`}
+                                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded text-xs sm:text-sm font-medium transition-all min-w-[24px] sm:min-w-[32px] ${bgClass}`}
                             >
                                 {l.id}
                             </button>
@@ -1028,55 +1028,53 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                 </div>
             </div>
 
-            {/* 2. Main Game Header (Controls) - Optimized for Mobile */}
-            <div className="bg-slate-800/90 p-2 sm:p-4 flex flex-wrap items-center justify-between gap-2 sm:gap-4 z-10 backdrop-blur-sm border-b border-white/5 relative">
-                <div className="flex-1 min-w-[120px]">
-                    <h2 className="text-sm sm:text-xl font-bold text-white flex items-center gap-2 truncate">
-                        <span className="text-blue-400">Lvl {level}:</span>
-                        <span className="hidden sm:inline">{currentLevelConfig.name}</span>
+            {/* 2. Main Game Header (Controls) - Ultra Compressed for Mobile */}
+            <div className="bg-slate-800/90 p-1 sm:p-3 flex flex-wrap items-center justify-between gap-1 sm:gap-3 z-10 backdrop-blur-sm border-b border-white/5 relative">
+                <div className="flex-1 min-w-[60px]">
+                    <h2 className="text-xs sm:text-lg font-bold text-white flex items-center gap-1 truncate">
+                        <span className="text-blue-400">L{level}</span>
+                        <span className="hidden md:inline text-xs">: {currentLevelConfig.name}</span>
                     </h2>
-                    {/* Hide description on mobile to save space */}
-                    <p className="text-xs sm:text-sm text-slate-400 max-w-md line-clamp-1 hidden sm:block">{currentLevelConfig.description}</p>
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
-                    {/* Leaderboard Toggle (Mobile/Desktop) */}
+                <div className="flex items-center gap-1 sm:gap-2">
+                    {/* Leaderboard Toggle - Smaller on Mobile */}
                     <button
                         onClick={() => setLeaderboardOpen(!leaderboardOpen)}
-                        className={`p-2 rounded-lg transition-colors ${leaderboardOpen ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 text-slate-400'}`}
-                        title="Цагийн хуваарь"
+                        className={`p-1 sm:p-2 rounded transition-colors ${leaderboardOpen ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 text-slate-400'}`}
+                        title="Тэргүүлэгчид"
                     >
-                        <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
                     </button>
 
-                    {/* Laser Toggle */}
+                    {/* Laser Toggle - Icon only on mobile */}
                     <button
                         onClick={() => setIsLaserOn(!isLaserOn)}
-                        className={`flex items-center justify-center p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-colors ${isLaserOn
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30'
-                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                        className={`flex items-center justify-center p-1 sm:p-2 rounded text-xs sm:text-sm font-medium transition-colors ${isLaserOn
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                            : 'bg-slate-700 text-slate-400'
                             }`}
-                        title="Лазер асаах/унтраах"
+                        title="Лазер"
                     >
-                        {isLaserOn ? <Lightbulb className="w-4 h-4" /> : <LightbulbOff className="w-4 h-4" />}
-                        <span className="hidden sm:inline ml-2">{isLaserOn ? 'ON' : 'OFF'}</span>
+                        {isLaserOn ? <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4" /> : <LightbulbOff className="w-3 h-3 sm:w-4 sm:h-4" />}
+                        <span className="hidden md:inline ml-1 text-xs">{isLaserOn ? 'ON' : 'OFF'}</span>
                     </button>
 
-                    <div className="font-mono text-sm sm:text-xl text-yellow-500 bg-black/30 px-2 sm:px-3 py-1 rounded border border-yellow-500/20 tabular-nums min-w-[60px] sm:min-w-[80px] text-center">
+                    <div className="font-mono text-xs sm:text-lg text-yellow-500 bg-black/30 px-1 sm:px-2 py-0.5 sm:py-1 rounded border border-yellow-500/20 tabular-nums min-w-[40px] sm:min-w-[70px] text-center">
                         {(elapsedTime / 1000).toFixed(1)}s
                     </div>
 
                     {isTeacher ? (
                         // Teacher Controls
                         isPlaying || element.gameStatus === 'playing' ? (
-                            <Button variant="destructive" size="sm" onClick={() => { setIsPlaying(false); /* Optional: Stop global? */ }} className="h-8 sm:h-9">
-                                <Pause className="w-4 h-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Зогсоох</span>
+                            <Button variant="destructive" size="sm" onClick={() => { setIsPlaying(false); }} className="h-6 px-2 sm:h-8 sm:px-3">
+                                <Pause className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                                <span className="hidden md:inline text-xs">Stop</span>
                             </Button>
                         ) : (
-                            <Button size="sm" onClick={handleGlobalStart} className="bg-green-600 hover:bg-green-500 h-8 sm:h-9 shadow-lg shadow-green-500/20 animate-pulse">
-                                <Play className="w-4 h-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Эхлүүлэх</span>
+                            <Button size="sm" onClick={handleGlobalStart} className="bg-green-600 hover:bg-green-500 h-6 px-2 sm:h-8 sm:px-3 shadow-lg shadow-green-500/20 animate-pulse">
+                                <Play className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                                <span className="hidden md:inline text-xs">Start</span>
                             </Button>
                         )
                     ) : (
@@ -1095,139 +1093,142 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                 </div>
             </div>
 
-            {/* Canvas Area */}
-            <div
-                ref={containerRef}
-                className="flex-1 relative bg-slate-900 overflow-auto touch-pan-x touch-pan-y"
-                style={{
-                    backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0) 0%, rgba(2, 6, 23, 1) 100%)'
-                }}
-            >
-                <canvas
-                    ref={canvasRef}
-                    className="cursor-crosshair shadow-2xl mx-auto my-auto relative z-0"
-                />
+            {/* Canvas + Toolbar Container - Row on mobile, Column on desktop */}
+            <div className="flex flex-row md:flex-col flex-1 min-h-0">
+                {/* Canvas Area */}
+                <div
+                    ref={containerRef}
+                    className="flex-1 relative bg-slate-900 overflow-auto touch-pan-x touch-pan-y"
+                    style={{
+                        backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0) 0%, rgba(2, 6, 23, 1) 100%)'
+                    }}
+                >
+                    <canvas
+                        ref={canvasRef}
+                        className="cursor-crosshair shadow-2xl mx-auto my-auto relative z-0"
+                    />
 
-                {/* Visual Tool Rendering (React based, because tools are state) */}
-                <div className="absolute inset-0 pointer-events-none">
-                    {[...currentLevelConfig.obstacles, ...tools].map(tool => (
-                        <div
-                            key={tool.id}
-                            className={`absolute ${tool.isLocked ? '' : 'cursor-move pointer-events-auto touch-none'} z-10`}
-                            style={{
-                                left: tool.x,
-                                top: tool.y,
-                                width: tool.width,
-                                height: tool.height || 10,
-                                transform: `translate(-50%, -50%) rotate(${tool.rotation}deg)`
-                            }}
-                            onPointerDown={(e) => {
-                                if (tool.isLocked) return;
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setDragState({
-                                    type: 'move',
-                                    toolId: tool.id,
-                                    startX: e.clientX,
-                                    startY: e.clientY,
-                                    startValueX: tool.x,
-                                    startValueY: tool.y
-                                });
-                            }}
-                        >
-                            {/* Visuals */}
-                            {tool.type === 'mirror' && (
-                                <div className={`w-full h-full bg-slate-300 border-b-4 ${tool.isLocked ? 'border-slate-600 bg-slate-500' : 'border-slate-500'} rounded-sm shadow-md overflow-hidden relative`}>
-                                    <div className="absolute inset-0 bg-gradient-to-b from-white/80 to-transparent opacity-50" />
-                                    <div className="absolute top-0 left-0 w-full h-[1px] bg-white shadow-[0_0_10px_white]" />
-                                </div>
-                            )}
-                            {tool.type === 'block' && (
-                                <div className={`w-full h-full ${tool.isLocked ? 'bg-slate-700 border-slate-500' : 'bg-blue-100/30 border-blue-300/50'} border backdrop-blur-[2px] rounded-sm shadow-inner relative overflow-hidden`}>
-                                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-blue-500/10" />
-                                </div>
-                            )}
-                            {tool.type === 'wall' && (
-                                <div className="w-full h-full bg-stone-800 border-2 border-stone-600 rounded-sm shadow-lg pattern-diagonal-lines pattern-stone-900 pattern-bg-stone-800 pattern-opacity-20 pattern-size-2" />
-                            )}
-                            {tool.type === 'lens' && (
-                                <div className="w-full h-full relative flex items-center justify-center">
-                                    {/* Double Convex Shape using SVG */}
-                                    {/* Dimensions are relative to the container which is sized by tool.width/height */}
-                                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible drop-shadow-md">
-                                        {/* We simply draw two curves. 
-                                            The container is `width` x `height`.
-                                            In viewBox, we can map 0..100 to that.
-                                            Actually, since width is small (20) and height large (100), the aspect ratio is 1:5.
-                                            Better to use absolute paths in a 0-100 x 0-100 box where 0-100 x matches width? No.
-                                            Let's just use a path that fills the box.
-                                            M 50 0 Q 100 50 50 100 Q 0 50 50 0 Z 
-                                            This is an eye shape.
-                                        */}
-                                        <path
-                                            d="M 50 0 Q 100 50 50 100 Q 0 50 50 0 Z"
-                                            className="fill-blue-400/30 stroke-blue-400 stroke-[2px]"
-                                            vectorEffect="non-scaling-stroke"
-                                        />
-                                    </svg>
-                                    <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none" style={{ clipPath: 'ellipse(40% 50% at 50% 50%)' }} />
-                                </div>
-                            )}
+                    {/* Visual Tool Rendering (React based, because tools are state) */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        {[...currentLevelConfig.obstacles, ...tools].map(tool => (
+                            <div
+                                key={tool.id}
+                                className={`absolute ${tool.isLocked ? '' : 'cursor-move pointer-events-auto touch-none'} z-10`}
+                                style={{
+                                    left: tool.x,
+                                    top: tool.y,
+                                    width: tool.width,
+                                    height: tool.height || 10,
+                                    transform: `translate(-50%, -50%) rotate(${tool.rotation}deg)`
+                                }}
+                                onPointerDown={(e) => {
+                                    if (tool.isLocked) return;
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragState({
+                                        type: 'move',
+                                        toolId: tool.id,
+                                        startX: e.clientX,
+                                        startY: e.clientY,
+                                        startValueX: tool.x,
+                                        startValueY: tool.y
+                                    });
+                                }}
+                            >
+                                {/* Visuals */}
+                                {tool.type === 'mirror' && (
+                                    <div className={`w-full h-full bg-slate-300 border-b-4 ${tool.isLocked ? 'border-slate-600 bg-slate-500' : 'border-slate-500'} rounded-sm shadow-md overflow-hidden relative`}>
+                                        <div className="absolute inset-0 bg-gradient-to-b from-white/80 to-transparent opacity-50" />
+                                        <div className="absolute top-0 left-0 w-full h-[1px] bg-white shadow-[0_0_10px_white]" />
+                                    </div>
+                                )}
+                                {tool.type === 'block' && (
+                                    <div className={`w-full h-full ${tool.isLocked ? 'bg-slate-700 border-slate-500' : 'bg-blue-100/30 border-blue-300/50'} border backdrop-blur-[2px] rounded-sm shadow-inner relative overflow-hidden`}>
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-blue-500/10" />
+                                    </div>
+                                )}
+                                {tool.type === 'wall' && (
+                                    <div className="w-full h-full bg-stone-800 border-2 border-stone-600 rounded-sm shadow-lg pattern-diagonal-lines pattern-stone-900 pattern-bg-stone-800 pattern-opacity-20 pattern-size-2" />
+                                )}
+                                {tool.type === 'lens' && (
+                                    <div className="w-full h-full relative flex items-center justify-center">
+                                        {/* Double Convex Shape using SVG */}
+                                        {/* Dimensions are relative to the container which is sized by tool.width/height */}
+                                        <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible drop-shadow-md">
+                                            {/* We simply draw two curves. 
+                                                The container is `width` x `height`.
+                                                In viewBox, we can map 0..100 to that.
+                                                Actually, since width is small (20) and height large (100), the aspect ratio is 1:5.
+                                                Better to use absolute paths in a 0-100 x 0-100 box where 0-100 x matches width? No.
+                                                Let's just use a path that fills the box.
+                                                M 50 0 Q 100 50 50 100 Q 0 50 50 0 Z 
+                                                This is an eye shape.
+                                            */}
+                                            <path
+                                                d="M 50 0 Q 100 50 50 100 Q 0 50 50 0 Z"
+                                                className="fill-blue-400/30 stroke-blue-400 stroke-[2px]"
+                                                vectorEffect="non-scaling-stroke"
+                                            />
+                                        </svg>
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none" style={{ clipPath: 'ellipse(40% 50% at 50% 50%)' }} />
+                                    </div>
+                                )}
 
-                            {/* Rotation Handle */}
-                            {!tool.isLocked && (
-                                <div
-                                    className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center cursor-ew-resize hover:bg-slate-600 transition-colors pointer-events-auto border border-white/20 shadow-lg z-50"
-                                    title="Эргүүлэх"
-                                    onPointerDown={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        setDragState({
-                                            type: 'rotate',
-                                            toolId: tool.id,
-                                            startX: e.clientX,
-                                            startY: e.clientY,
-                                            startValueX: tool.rotation,
-                                            startValueY: 0
-                                        });
-                                    }}
-                                >
-                                    <RotateCw className="w-3 h-3 text-white" />
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                {/* Rotation Handle */}
+                                {!tool.isLocked && (
+                                    <div
+                                        className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center cursor-ew-resize hover:bg-slate-600 transition-colors pointer-events-auto border border-white/20 shadow-lg z-50"
+                                        title="Эргүүлэх"
+                                        onPointerDown={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            setDragState({
+                                                type: 'rotate',
+                                                toolId: tool.id,
+                                                startX: e.clientX,
+                                                startY: e.clientY,
+                                                startValueX: tool.rotation,
+                                                startValueY: 0
+                                            });
+                                        }}
+                                    >
+                                        <RotateCw className="w-3 h-3 text-white" />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* 3. Global Toolbar (Bottom) */}
-            <div className="bg-slate-800 p-3 border-t border-slate-700 flex justify-center gap-4 z-20">
-                <p className="text-white text-sm font-medium self-center mr-2 hidden sm:block">Багажууд:</p>
-                <button
-                    onClick={() => addTool('mirror')}
-                    className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-16 h-16 rounded-lg border border-slate-600 transition-all active:scale-95 group"
-                    title="Толь нэмэх"
-                >
-                    <div className="w-8 h-1 bg-slate-300 rotate-[-45deg] mb-1 group-hover:shadow-[0_0_10px_white]"></div>
-                    <span className="text-[10px]">Толь</span>
-                </button>
-                <button
-                    onClick={() => addTool('block')}
-                    className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-16 h-16 rounded-lg border border-slate-600 transition-all active:scale-95 group"
-                    title="Шил нэмэх"
-                >
-                    <div className="w-6 h-6 bg-blue-400/30 border border-blue-400 mb-1 group-hover:shadow-[0_0_15px_blue]"></div>
-                    <span className="text-[10px]">Шил</span>
-                </button>
-                <button
-                    onClick={() => addTool('lens')}
-                    className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-16 h-16 rounded-lg border border-slate-600 transition-all active:scale-95 group"
-                    title="Линз нэмэх"
-                >
-                    {/* Icon for Lens: Eye shape */}
-                    <div className="w-8 h-4 rounded-[100%] bg-blue-400/30 border border-blue-400 mb-1 group-hover:shadow-[0_0_15px_blue] transform rotate-90"></div>
-                    <span className="text-[10px]">Линз</span>
-                </button>
+                {/* 3. Global Toolbar - Right side on mobile, Bottom on desktop */}
+                <div className="bg-slate-800 p-2 md:p-3 border-l md:border-l-0 md:border-t border-slate-700 flex flex-col md:flex-row justify-center items-center gap-2 md:gap-4 z-20">
+                    <p className="text-white text-xs font-medium self-center hidden lg:block rotate-0">Багаж:</p>
+                    <button
+                        onClick={() => addTool('mirror')}
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        title="Толь"
+                    >
+                        <div className="w-6 h-0.5 sm:w-7 sm:h-1 bg-slate-300 rotate-[-45deg] mb-0.5 sm:mb-1 group-hover:shadow-[0_0_10px_white]"></div>
+                        <span className="text-[8px] sm:text-[10px]">Толь</span>
+                    </button>
+                    <button
+                        onClick={() => addTool('block')}
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        title="Шил"
+                    >
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-400/30 border border-blue-400 mb-0.5 sm:mb-1 group-hover:shadow-[0_0_15px_blue]"></div>
+                        <span className="text-[8px] sm:text-[10px]">Шил</span>
+                    </button>
+                    <button
+                        onClick={() => addTool('lens')}
+                        className="flex flex-col items-center justify-center bg-slate-700 hover:bg-slate-600 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded border border-slate-600 transition-all active:scale-95 group"
+                        title="Линз"
+                    >
+                        {/* Icon for Lens: Eye shape */}
+                        <div className="w-6 h-3 sm:w-7 sm:h-4 rounded-[100%] bg-blue-400/30 border border-blue-400 mb-0.5 sm:mb-1 group-hover:shadow-[0_0_15px_blue] transform rotate-90"></div>
+                        <span className="text-[8px] sm:text-[10px]">Линз</span>
+                    </button>
+                </div>
             </div>
 
             {/* Waiting for Teacher Overlay */}
