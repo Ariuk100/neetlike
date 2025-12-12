@@ -55,6 +55,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
 
     const [activeStudentView, setActiveStudentView] = useState<string>('');
     const [allStudentsData, setAllStudentsData] = useState<Record<string, GraphData>>({});
+    const [mobileTab, setMobileTab] = useState<'table' | 'graph'>('table'); // Mobile tab state
 
     // Firestore paths - must have even number of segments (collection/doc pairs)
     const graphDataPath = `whiteboard_sessions/${sessionId}/pages/${currentPage}/graph_data/${element.id}`;
@@ -519,151 +520,178 @@ export default function GraphPlotter(props: GraphPlotterProps) {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-4 gap-2 sm:gap-4 overflow-hidden">
-            {/* Left: Table */}
-            <div className="flex-1 flex flex-col bg-white rounded-lg shadow-lg p-2 sm:p-4 overflow-hidden">
-                <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
-                    <h3 className="font-bold text-sm sm:text-lg text-gray-800">Координатын хүснэгт</h3>
-                    {!isTeacher && (
-                        <Button
-                            onClick={handleShareToTeacher}
-                            size="sm"
-                            className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm"
-                        >
-                            <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                            Багшид харуулах
-                        </Button>
-                    )}
-                </div>
-
-                {isTeacher && activeStudentView && (
-                    <div className="mb-2 p-2 bg-blue-100 rounded text-sm">
-                        <strong>{activeStudentView}</strong>-ийн график
-                        {(() => {
-                            const studentData = allStudentsData[activeStudentView];
-                            if (studentData?.slope !== undefined && studentData?.slope !== null) {
-                                return (
-                                    <div className="mt-1 text-green-700 font-bold">
-                                        Налалт: {studentData.slope.toFixed(3)}
-                                    </div>
-                                );
-                            }
-                            return null;
-                        })()}
-                    </div>
-                )}
-
-                {/* Teacher: All Students Slopes Summary */}
-                {isTeacher && Object.keys(allStudentsData).length > 0 && (
-                    <div className="mb-2 p-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded">
-                        <div className="text-xs font-bold text-green-800 mb-2">Бүх сурагчдын налалт:</div>
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                            {Object.entries(allStudentsData).map(([studentName, data]) => (
-                                <div key={studentName} className="flex justify-between bg-white rounded px-2 py-1 border border-green-100">
-                                    <span className="font-medium truncate max-w-[100px]">{studentName}:</span>
-                                    <span className="font-bold text-green-700 ml-1">
-                                        {data.slope !== undefined && data.slope !== null
-                                            ? data.slope.toFixed(3)
-                                            : '-'}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex-1 overflow-auto custom-scrollbar">
-                    <table className="w-full border-collapse text-xs sm:text-sm">
-                        <thead className="sticky top-0 bg-gray-100">
-                            <tr>
-                                <th className="border border-gray-300 p-1 sm:p-2 w-12 sm:w-16">#</th>
-                                <th className="border border-gray-300 p-1 sm:p-2">x</th>
-                                <th className="border border-gray-300 p-1 sm:p-2">y</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(() => {
-                                // Show active student's data for teacher, or own data for student
-                                const viewData = isTeacher && activeStudentView
-                                    ? allStudentsData[activeStudentView] || myData
-                                    : myData;
-
-                                return viewData.points.map((point, idx) => (
-                                    <tr key={point.id}>
-                                        <td className="border border-gray-300 p-1 sm:p-2 text-center font-semibold bg-gray-50">
-                                            {idx + 1}
-                                        </td>
-                                        <td className="border border-gray-300 p-0">
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                value={point.x}
-                                                onChange={(e) => handlePointChange(point.id, 'x', e.target.value)}
-                                                className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
-                                                disabled={isTeacher}
-                                            />
-                                        </td>
-                                        <td className="border border-gray-300 p-0">
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                value={point.y}
-                                                onChange={(e) => handlePointChange(point.id, 'y', e.target.value)}
-                                                className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
-                                                disabled={isTeacher}
-                                            />
-                                        </td>
-                                    </tr>
-                                ));
-                            })()}
-                        </tbody>
-                    </table>
-                </div>
-
-                {!isTeacher && (
-                    <div className="flex flex-col gap-2 mt-2 sm:mt-4 flex-shrink-0">
-                        <Button onClick={handleAddRow} size="sm" className="w-full">
-                            <Plus className="w-4 h-4 mr-1" />
-                            Мөр нэмэх
-                        </Button>
-                        <Button
-                            onClick={calculateSlope}
-                            size="sm"
-                            variant="outline"
-                            className="w-full border-green-500 text-green-700 hover:bg-green-50"
-                        >
-                            <Calculator className="w-4 h-4 mr-1" />
-                            Налалт бодох
-                        </Button>
-                        {myData.slope !== undefined && myData.slope !== null && (
-                            <div className="p-2 bg-green-50 border border-green-200 rounded text-center">
-                                <div className="text-xs text-green-600 font-medium">Налалт:</div>
-                                <div className="text-lg font-bold text-green-700">{myData.slope.toFixed(3)}</div>
-                            </div>
-                        )}
-                    </div>
-                )}
+        <div className="flex flex-col w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden">
+            {/* Mobile Tab Navigation - Only visible on mobile (< lg breakpoint) */}
+            <div className="lg:hidden flex bg-white border-b border-gray-200 flex-shrink-0">
+                <button
+                    onClick={() => setMobileTab('table')}
+                    className={`flex-1 py-3 px-4 font-semibold text-sm transition-colors ${mobileTab === 'table'
+                            ? 'bg-blue-500 text-white border-b-2 border-blue-600'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                >
+                    Хүснэгт
+                </button>
+                <button
+                    onClick={() => setMobileTab('graph')}
+                    className={`flex-1 py-3 px-4 font-semibold text-sm transition-colors ${mobileTab === 'graph'
+                            ? 'bg-blue-500 text-white border-b-2 border-blue-600'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                >
+                    График
+                </button>
             </div>
 
-            {/* Right: Coordinate System */}
-            <div className="flex-1 flex flex-col bg-white rounded-lg shadow-lg p-2 sm:p-4 overflow-hidden">
-                <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
-                    <h3 className="font-bold text-sm sm:text-lg text-gray-800">График</h3>
+            {/* Content Container */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-4 p-0 lg:p-4 overflow-hidden">
+                {/* Table Section */}
+                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-4 overflow-hidden ${mobileTab === 'table' ? 'flex' : 'hidden lg:flex'
+                    }`}>
+                    <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
+                        <h3 className="font-bold text-sm sm:text-lg text-gray-800">Координатын хүснэгт</h3>
+                        {!isTeacher && (
+                            <Button
+                                onClick={handleShareToTeacher}
+                                size="sm"
+                                className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm"
+                            >
+                                <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                Багшид харуулах
+                            </Button>
+                        )}
+                    </div>
+
+                    {isTeacher && activeStudentView && (
+                        <div className="mb-2 p-2 bg-blue-100 rounded text-sm">
+                            <strong>{activeStudentView}</strong>-ийн график
+                            {(() => {
+                                const studentData = allStudentsData[activeStudentView];
+                                if (studentData?.slope !== undefined && studentData?.slope !== null) {
+                                    return (
+                                        <div className="mt-1 text-green-700 font-bold">
+                                            Налалт: {studentData.slope.toFixed(3)}
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
+                    )}
+
+                    {/* Teacher: All Students Slopes Summary */}
+                    {isTeacher && Object.keys(allStudentsData).length > 0 && (
+                        <div className="mb-2 p-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded">
+                            <div className="text-xs font-bold text-green-800 mb-2">Бүх сурагчдын налалт:</div>
+                            <div className="grid grid-cols-2 gap-1 text-xs">
+                                {Object.entries(allStudentsData).map(([studentName, data]) => (
+                                    <div key={studentName} className="flex justify-between bg-white rounded px-2 py-1 border border-green-100">
+                                        <span className="font-medium truncate max-w-[100px]">{studentName}:</span>
+                                        <span className="font-bold text-green-700 ml-1">
+                                            {data.slope !== undefined && data.slope !== null
+                                                ? data.slope.toFixed(3)
+                                                : '-'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <table className="w-full border-collapse text-xs sm:text-sm">
+                            <thead className="sticky top-0 bg-gray-100">
+                                <tr>
+                                    <th className="border border-gray-300 p-1 sm:p-2 w-12 sm:w-16">#</th>
+                                    <th className="border border-gray-300 p-1 sm:p-2">x</th>
+                                    <th className="border border-gray-300 p-1 sm:p-2">y</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(() => {
+                                    // Show active student's data for teacher, or own data for student
+                                    const viewData = isTeacher && activeStudentView
+                                        ? allStudentsData[activeStudentView] || myData
+                                        : myData;
+
+                                    return viewData.points.map((point, idx) => (
+                                        <tr key={point.id}>
+                                            <td className="border border-gray-300 p-1 sm:p-2 text-center font-semibold bg-gray-50">
+                                                {idx + 1}
+                                            </td>
+                                            <td className="border border-gray-300 p-0">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={point.x}
+                                                    onChange={(e) => handlePointChange(point.id, 'x', e.target.value)}
+                                                    className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
+                                                    disabled={isTeacher}
+                                                />
+                                            </td>
+                                            <td className="border border-gray-300 p-0">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={point.y}
+                                                    onChange={(e) => handlePointChange(point.id, 'y', e.target.value)}
+                                                    className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
+                                                    disabled={isTeacher}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+
                     {!isTeacher && (
-                        <Button
-                            onClick={toggleRenderMode}
-                            size="sm"
-                            variant="outline"
-                            className="text-xs sm:text-sm"
-                        >
-                            <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                            {myData.renderMode === 'line' ? 'Шулуун' : 'Муруй'}
-                        </Button>
+                        <div className="flex flex-col gap-2 mt-2 sm:mt-4 flex-shrink-0">
+                            <Button onClick={handleAddRow} size="sm" className="w-full">
+                                <Plus className="w-4 h-4 mr-1" />
+                                Мөр нэмэх
+                            </Button>
+                            <Button
+                                onClick={calculateSlope}
+                                size="sm"
+                                variant="outline"
+                                className="w-full border-green-500 text-green-700 hover:bg-green-50"
+                            >
+                                <Calculator className="w-4 h-4 mr-1" />
+                                Налалт бодох
+                            </Button>
+                            {myData.slope !== undefined && myData.slope !== null && (
+                                <div className="p-2 bg-green-50 border border-green-200 rounded text-center">
+                                    <div className="text-xs text-green-600 font-medium">Налалт:</div>
+                                    <div className="text-lg font-bold text-green-700">{myData.slope.toFixed(3)}</div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
-                <div className="flex-1 flex items-center justify-center overflow-hidden">
-                    {renderCoordinateSystem()}
+                {/* Graph Section */}
+                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-4 overflow-hidden ${mobileTab === 'graph' ? 'flex' : 'hidden lg:flex'
+                    }`}>
+                    <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
+                        <h3 className="font-bold text-sm sm:text-lg text-gray-800">График</h3>
+                        {!isTeacher && (
+                            <Button
+                                onClick={toggleRenderMode}
+                                size="sm"
+                                variant="outline"
+                                className="text-xs sm:text-sm"
+                            >
+                                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                {myData.renderMode === 'line' ? 'Шулуун' : 'Муруй'}
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="flex-1 flex items-center justify-center overflow-hidden">
+                        {renderCoordinateSystem()}
+                    </div>
                 </div>
             </div>
         </div>
