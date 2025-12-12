@@ -525,18 +525,18 @@ export default function GraphPlotter(props: GraphPlotterProps) {
             <div className="lg:hidden flex bg-white border-b border-gray-200 flex-shrink-0">
                 <button
                     onClick={() => setMobileTab('table')}
-                    className={`flex-1 py-3 px-4 font-semibold text-sm transition-colors ${mobileTab === 'table'
-                            ? 'bg-blue-500 text-white border-b-2 border-blue-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    className={`flex-1 py-2 px-2 font-semibold text-xs transition-colors ${mobileTab === 'table'
+                        ? 'bg-blue-500 text-white border-b-2 border-blue-600'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
                     Хүснэгт
                 </button>
                 <button
                     onClick={() => setMobileTab('graph')}
-                    className={`flex-1 py-3 px-4 font-semibold text-sm transition-colors ${mobileTab === 'graph'
-                            ? 'bg-blue-500 text-white border-b-2 border-blue-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    className={`flex-1 py-2 px-2 font-semibold text-xs transition-colors ${mobileTab === 'graph'
+                        ? 'bg-blue-500 text-white border-b-2 border-blue-600'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
                     График
@@ -546,30 +546,30 @@ export default function GraphPlotter(props: GraphPlotterProps) {
             {/* Content Container */}
             <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-4 p-0 lg:p-4 overflow-hidden">
                 {/* Table Section */}
-                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-4 overflow-hidden ${mobileTab === 'table' ? 'flex' : 'hidden lg:flex'
+                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-2 lg:p-4 overflow-hidden ${mobileTab === 'table' ? 'flex' : 'hidden lg:flex'
                     }`}>
-                    <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
-                        <h3 className="font-bold text-sm sm:text-lg text-gray-800">Координатын хүснэгт</h3>
+                    <div className="flex items-center justify-between mb-1 lg:mb-3 flex-shrink-0">
+                        <h3 className="font-bold text-xs lg:text-base text-gray-800">Координатын хүснэгт</h3>
                         {!isTeacher && (
                             <Button
                                 onClick={handleShareToTeacher}
                                 size="sm"
-                                className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm"
+                                className="bg-green-500 hover:bg-green-600 text-[10px] lg:text-xs py-1 px-2"
                             >
-                                <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <Eye className="w-3 h-3 mr-0.5" />
                                 Багшид харуулах
                             </Button>
                         )}
                     </div>
 
                     {isTeacher && activeStudentView && (
-                        <div className="mb-2 p-2 bg-blue-100 rounded text-sm">
+                        <div className="mb-1 p-1.5 bg-blue-100 rounded text-xs">
                             <strong>{activeStudentView}</strong>-ийн график
                             {(() => {
                                 const studentData = allStudentsData[activeStudentView];
                                 if (studentData?.slope !== undefined && studentData?.slope !== null) {
                                     return (
-                                        <div className="mt-1 text-green-700 font-bold">
+                                        <div className="mt-0.5 text-green-700 font-bold text-[10px]">
                                             Налалт: {studentData.slope.toFixed(3)}
                                         </div>
                                     );
@@ -581,9 +581,9 @@ export default function GraphPlotter(props: GraphPlotterProps) {
 
                     {/* Teacher: All Students Slopes Summary */}
                     {isTeacher && Object.keys(allStudentsData).length > 0 && (
-                        <div className="mb-2 p-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded">
-                            <div className="text-xs font-bold text-green-800 mb-2">Бүх сурагчдын налалт:</div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
+                        <div className="mb-1 p-1.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded">
+                            <div className="text-[10px] font-bold text-green-800 mb-1">Бүх сурагчдын налалт:</div>
+                            <div className="grid grid-cols-2 gap-0.5 text-[9px]">
                                 {Object.entries(allStudentsData).map(([studentName, data]) => (
                                     <div key={studentName} className="flex justify-between bg-white rounded px-2 py-1 border border-green-100">
                                         <span className="font-medium truncate max-w-[100px]">{studentName}:</span>
@@ -598,13 +598,13 @@ export default function GraphPlotter(props: GraphPlotterProps) {
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-auto custom-scrollbar">
-                        <table className="w-full border-collapse text-xs sm:text-sm">
+                    <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
+                        <table className="w-full border-collapse text-[10px] lg:text-xs">
                             <thead className="sticky top-0 bg-gray-100">
                                 <tr>
-                                    <th className="border border-gray-300 p-1 sm:p-2 w-12 sm:w-16">#</th>
-                                    <th className="border border-gray-300 p-1 sm:p-2">x</th>
-                                    <th className="border border-gray-300 p-1 sm:p-2">y</th>
+                                    <th className="border border-gray-300 p-0.5 lg:p-1.5 w-8 lg:w-12">#</th>
+                                    <th className="border border-gray-300 p-0.5 lg:p-1.5">x</th>
+                                    <th className="border border-gray-300 p-0.5 lg:p-1.5">y</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -616,7 +616,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
 
                                     return viewData.points.map((point, idx) => (
                                         <tr key={point.id}>
-                                            <td className="border border-gray-300 p-1 sm:p-2 text-center font-semibold bg-gray-50">
+                                            <td className="border border-gray-300 p-0.5 lg:p-1.5 text-center font-semibold bg-gray-50">
                                                 {idx + 1}
                                             </td>
                                             <td className="border border-gray-300 p-0">
@@ -625,7 +625,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
                                                     step="0.1"
                                                     value={point.x}
                                                     onChange={(e) => handlePointChange(point.id, 'x', e.target.value)}
-                                                    className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
+                                                    className="w-full p-0.5 lg:p-1.5 text-center outline-none focus:bg-blue-50"
                                                     disabled={isTeacher}
                                                 />
                                             </td>
@@ -635,7 +635,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
                                                     step="0.1"
                                                     value={point.y}
                                                     onChange={(e) => handlePointChange(point.id, 'y', e.target.value)}
-                                                    className="w-full p-1 sm:p-2 text-center outline-none focus:bg-blue-50"
+                                                    className="w-full p-0.5 lg:p-1.5 text-center outline-none focus:bg-blue-50"
                                                     disabled={isTeacher}
                                                 />
                                             </td>
@@ -647,24 +647,24 @@ export default function GraphPlotter(props: GraphPlotterProps) {
                     </div>
 
                     {!isTeacher && (
-                        <div className="flex flex-col gap-2 mt-2 sm:mt-4 flex-shrink-0">
-                            <Button onClick={handleAddRow} size="sm" className="w-full">
-                                <Plus className="w-4 h-4 mr-1" />
+                        <div className="flex flex-col gap-1 mt-1.5 lg:mt-3 flex-shrink-0">
+                            <Button onClick={handleAddRow} size="sm" className="w-full text-[10px] lg:text-xs py-1 h-7">
+                                <Plus className="w-3 h-3 mr-0.5" />
                                 Мөр нэмэх
                             </Button>
                             <Button
                                 onClick={calculateSlope}
                                 size="sm"
                                 variant="outline"
-                                className="w-full border-green-500 text-green-700 hover:bg-green-50"
+                                className="w-full border-green-500 text-green-700 hover:bg-green-50 text-[10px] lg:text-xs py-1 h-7"
                             >
-                                <Calculator className="w-4 h-4 mr-1" />
+                                <Calculator className="w-3 h-3 mr-0.5" />
                                 Налалт бодох
                             </Button>
                             {myData.slope !== undefined && myData.slope !== null && (
-                                <div className="p-2 bg-green-50 border border-green-200 rounded text-center">
-                                    <div className="text-xs text-green-600 font-medium">Налалт:</div>
-                                    <div className="text-lg font-bold text-green-700">{myData.slope.toFixed(3)}</div>
+                                <div className="p-1 bg-green-50 border border-green-200 rounded text-center">
+                                    <div className="text-[9px] text-green-600 font-medium">Налалт:</div>
+                                    <div className="text-sm font-bold text-green-700">{myData.slope.toFixed(3)}</div>
                                 </div>
                             )}
                         </div>
@@ -672,18 +672,18 @@ export default function GraphPlotter(props: GraphPlotterProps) {
                 </div>
 
                 {/* Graph Section */}
-                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-4 overflow-hidden ${mobileTab === 'graph' ? 'flex' : 'hidden lg:flex'
+                <div className={`flex-1 flex flex-col bg-white lg:rounded-lg lg:shadow-lg p-2 lg:p-4 overflow-hidden ${mobileTab === 'graph' ? 'flex' : 'hidden lg:flex'
                     }`}>
-                    <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
-                        <h3 className="font-bold text-sm sm:text-lg text-gray-800">График</h3>
+                    <div className="flex items-center justify-between mb-1 lg:mb-3 flex-shrink-0">
+                        <h3 className="font-bold text-xs lg:text-base text-gray-800">График</h3>
                         {!isTeacher && (
                             <Button
                                 onClick={toggleRenderMode}
                                 size="sm"
                                 variant="outline"
-                                className="text-xs sm:text-sm"
+                                className="text-[10px] lg:text-xs py-1 px-2"
                             >
-                                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <TrendingUp className="w-3 h-3 mr-0.5" />
                                 {myData.renderMode === 'line' ? 'Шулуун' : 'Муруй'}
                             </Button>
                         )}
