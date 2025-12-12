@@ -679,6 +679,27 @@ export default function WhiteboardCanvas({
         }
     };
 
+    const createGraphPlotterElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'graph_plotter',
+                x: 10,
+                y: 10,
+                width: 80,
+                height: 80,
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
+
+            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("График зурагч нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating graph plotter:", error);
+            toast.error("График зурагч нэмэхэд алдаа гарлаа");
+        }
+    };
+
 
 
     // ------------------------------------------------------------------
@@ -899,6 +920,9 @@ export default function WhiteboardCanvas({
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={createOpticsGameElement}>
                                                 <div className="flex items-center">🔦 Optics Challenge</div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createGraphPlotterElement}>
+                                                <div className="flex items-center">📊 График зурагч</div>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
