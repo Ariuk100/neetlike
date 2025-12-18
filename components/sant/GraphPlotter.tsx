@@ -276,8 +276,8 @@ export default function GraphPlotter(props: GraphPlotterProps) {
         const avgMagnitudeX = (Math.abs(minX) + Math.abs(maxX)) / 2;
         const avgMagnitudeY = (Math.abs(minY) + Math.abs(maxY)) / 2;
 
-        const paddingX = calcPadding(rangeX, avgMagnitudeX);
-        const paddingY = calcPadding(rangeY, avgMagnitudeY);
+        const paddingX = calcPadding(rangeX);
+        const paddingY = calcPadding(rangeY);
 
         // Always try to include origin (0,0) if it's close to the data range
         // This helps provide context for scale
