@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -11,10 +12,26 @@ import QuizGame from './QuizGame';
 import WordScramble from './WordScramble';
 import OpticsGame from './OpticsGame';
 import GraphPlotter from './GraphPlotter';
+import MagneticMinesweeper from './MagneticMinesweeper';
+
+interface Magnet {
+    x: number;
+    y: number;
+    power: number;
+}
+
+interface GameResult {
+    userName: string;
+    moves: number;
+    time: number;
+    status: 'won' | 'lost';
+    caughtAt?: { x: number; y: number };
+    timestamp: number;
+}
 
 export interface WhiteboardElement {
     id: string;
-    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game' | 'word_scramble' | 'optics_game' | 'graph_plotter';
+    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game' | 'word_scramble' | 'optics_game' | 'graph_plotter' | 'magnetic_minesweeper';
     x: number;      // Percentage (0-100)
     y: number;      // Percentage (0-100)
     width: number;  // Percentage (0-100)
@@ -34,6 +51,15 @@ export interface WhiteboardElement {
     animationDuration?: number;
     createdAt: string;
     createdBy?: string;
+    // Magnetic Minesweeper properties
+    gameStatus?: string;
+    gridSize?: number;
+    magnets?: Magnet[];
+    discoveredMagnets?: number[];
+    startPos?: { x: number; y: number };
+    targetPos?: { x: number; y: number };
+    results?: GameResult[];
+    gameStartTime?: number;
 }
 
 interface ElementLayerProps {
@@ -387,7 +413,17 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 {element.content}
                             </div>
                         )}
-                        {/* Generic Iframe/Simulation - Reusing video interaction logic */}
+                        {element.type === 'magnetic_minesweeper' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <MagneticMinesweeper
+                                    isTeacher={isTeacher}
+                                    element={element as any}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                />
+                            </div>
+                        )}
                         {element.type === 'iframe' && element.url && (
                             <div className="w-full h-full relative pointer-events-auto">
                                 <iframe
@@ -425,7 +461,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 <PhotonRaceGame
                                     isTeacher={isTeacher}
                                     isAllowedDraw={isAllowedToWrite || isTeacher}
-                                    element={element}
+                                    element={element as any}
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
@@ -441,7 +477,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 <QuizGame
                                     isTeacher={isTeacher}
                                     isAllowedDraw={isAllowedToWrite || isTeacher}
-                                    element={element}
+                                    element={element as any}
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
@@ -453,7 +489,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                             <div className="w-full h-full relative pointer-events-auto">
                                 <WordScramble
                                     isTeacher={isTeacher}
-                                    element={element}
+                                    element={element as any}
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
@@ -468,7 +504,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                             <div className="w-full h-full relative pointer-events-auto">
                                 <OpticsGame
                                     isTeacher={isTeacher}
-                                    element={element}
+                                    element={element as any}
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
@@ -480,13 +516,15 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                             <div className="w-full h-full relative pointer-events-auto">
                                 <GraphPlotter
                                     isTeacher={isTeacher}
-                                    element={element}
+                                    element={element as any}
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
                                 />
                             </div>
                         )}
+
+
 
                         {/* Teacher Controls - Only when selected */}
                         {isSelected && !isInteracting && (
@@ -510,7 +548,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 )}
 
                                 {/* NEW: Video/Iframe/Game Interaction Toggle */}
-                                {(element.type === 'video' || element.type === 'iframe' || element.type === 'word_scramble' || element.type === 'quiz_game' || element.type === 'photon_game' || element.type === 'optics_game' || element.type === 'graph_plotter') && (
+                                {(element.type === 'video' || element.type === 'iframe' || element.type === 'word_scramble' || element.type === 'quiz_game' || element.type === 'photon_game' || element.type === 'optics_game' || element.type === 'graph_plotter' || element.type === 'magnetic_minesweeper') && (
                                     <button
                                         className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 z-50 shadow-md pointer-events-auto"
                                         onPointerDown={(e) => {

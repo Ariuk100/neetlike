@@ -698,8 +698,33 @@ export default function WhiteboardCanvas({
             console.error("Error creating graph plotter:", error);
             toast.error("График зурагч нэмэхэд алдаа гарлаа");
         }
-    };
+    }; const createMagneticMinesweeperElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'magnetic_minesweeper',
+                x: 10,
+                y: 10,
+                width: 80,
+                height: 80,
+                gridSize: 10,
+                magnets: [],
+                discoveredMagnets: [],
+                startPos: { x: 0, y: 0 },
+                targetPos: { x: 9, y: 9 },
+                results: [],
+                gameStatus: 'setup',
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
 
+            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("Magnetic Minesweeper нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating game:", error);
+            toast.error("Тоглоом нэмэхэд алдаа гарлаа");
+        }
+    };
 
 
     // ------------------------------------------------------------------
@@ -924,6 +949,10 @@ export default function WhiteboardCanvas({
                                             <DropdownMenuItem onSelect={createGraphPlotterElement}>
                                                 <div className="flex items-center">📊 График зурагч</div>
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createMagneticMinesweeperElement}>
+                                                <div className="flex items-center">💣 Magnetic Minesweeper</div>
+                                            </DropdownMenuItem>
+
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
