@@ -263,7 +263,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
         // Adaptive padding: 20% for normal ranges, but ensure minimum padding
         // For very small ranges (< 1), use at least 0.5
         // For very large ranges (> 1000), use 15% to keep within bounds
-        const calcPadding = (range: number, magnitude: number) => {
+        const calcPadding = (range: number) => {
             if (range < 1) {
                 return Math.max(range * 0.3, 0.5);
             } else if (range > 1000) {
