@@ -42,6 +42,7 @@ interface WordScrambleProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
 const DEFAULT_MAX_WRONG_GUESSES = 8;
@@ -98,7 +99,7 @@ const HangmanStage = ({ wrongGuesses, maxWrongGuesses }: { wrongGuesses: number;
 };
 
 export default function WordScramble(props: WordScrambleProps) {
-    const { isTeacher, element, sessionId, userName } = props;
+    const { isTeacher, element, sessionId, userName, collectionName = 'whiteboard_sessions' } = props;
 
     const [jsonInput, setJsonInput] = useState('');
     const [activeTab, setActiveTab] = useState<'game' | 'leaderboard'>('game');
@@ -159,7 +160,7 @@ export default function WordScramble(props: WordScrambleProps) {
     // Firestore update
     const updateElement = useCallback(async (updates: Record<string, unknown>) => {
         try {
-            const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(props.currentPage), 'elements', element.id);
+            const elementRef = doc(db, collectionName, sessionId, 'pages', String(props.currentPage), 'elements', element.id);
             await updateDoc(elementRef, updates);
         } catch (e) {
             console.error('WordScramble update error:', e);

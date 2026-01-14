@@ -34,10 +34,11 @@ interface GraphPlotterProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
 export default function GraphPlotter(props: GraphPlotterProps) {
-    const { isTeacher, element, sessionId, currentPage, userName } = props;
+    const { isTeacher, element, sessionId, currentPage, userName, collectionName = 'whiteboard_sessions' } = props;
 
     const myId = userName.replace(/\s+/g, '_');
 
@@ -58,7 +59,7 @@ export default function GraphPlotter(props: GraphPlotterProps) {
     const [mobileTab, setMobileTab] = useState<'table' | 'graph'>('table'); // Mobile tab state
 
     // Firestore paths - must have even number of segments (collection/doc pairs)
-    const graphDataPath = `whiteboard_sessions/${sessionId}/pages/${currentPage}/graph_data/${element.id}`;
+    const graphDataPath = `${collectionName}/${sessionId}/pages/${currentPage}/graph_data/${element.id}`;
     const myDataPath = `${graphDataPath}/students/${myId}`;
     const activeViewPath = `${graphDataPath}/meta/activeView`; // Added 'meta' collection to make path valid
 

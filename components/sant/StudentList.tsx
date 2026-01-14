@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 
 interface StudentListProps {
     sessionId: string;
+    collectionName?: string;
 }
 
 interface Student {
@@ -22,14 +23,14 @@ interface Student {
     leftAt?: string | null;
 }
 
-export default function StudentList({ sessionId }: StudentListProps) {
+export default function StudentList({ sessionId, collectionName = 'whiteboard_sessions' }: StudentListProps) {
     const [students, setStudents] = useState<Student[]>([]);
 
     useEffect(() => {
         if (!sessionId) return;
 
         const q = query(
-            collection(db, 'whiteboard_sessions', sessionId, 'students')
+            collection(db, collectionName, sessionId, 'students')
             // orderBy('joinedAt', 'asc') // Requires index
         );
 

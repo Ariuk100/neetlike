@@ -42,10 +42,11 @@ interface PhotonRaceProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
 export default function PhotonRaceGame(props: PhotonRaceProps) {
-    const { isTeacher, isAllowedDraw, element, sessionId, userName } = props;
+    const { isTeacher, isAllowedDraw, element, sessionId, userName, collectionName = 'whiteboard_sessions' } = props;
     const [pathPoints, setPathPoints] = useState<{ x: number, y: number }[]>([]);
     const [timeLeft, setTimeLeft] = useState(10.0);
 
@@ -104,7 +105,7 @@ export default function PhotonRaceGame(props: PhotonRaceProps) {
     // --------------------------------------------------------------------------------
     const updateGameElement = useCallback(async (updates: Record<string, unknown>) => {
         try {
-            const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(props.currentPage), 'elements', element.id);
+            const elementRef = doc(db, collectionName, sessionId, 'pages', String(props.currentPage), 'elements', element.id);
             await updateDoc(elementRef, updates);
         } catch (e) {
             console.error('❌ Firestore error:', e);

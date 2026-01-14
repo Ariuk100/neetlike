@@ -34,6 +34,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // "cpp" collection-ийн дүрэм
+    // Багш нарын сургалтын модуль (багш нар нэрээрээ нэвтэрч байгаа тул түр нээлттэй)
+    match /cpp/{document=**} {
+      allow read, write: if true;
+      allow get, list: if true;
+    }
+
     // "active_sessions" collection-ийн дүрэм
     // Багш нар идэвхтэй хичээлээ энд бичиж, сурагчид уншдаг.
     match /active_sessions/{teacherId} {

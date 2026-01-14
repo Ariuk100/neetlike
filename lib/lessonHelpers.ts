@@ -24,7 +24,8 @@ export interface LessonTemplate {
 export async function saveSessionAsTemplate(
     sessionId: string,
     metadata: { title: string; subject: string; grade: string; authorName: string },
-    totalPages: number
+    totalPages: number,
+    collectionName: string = 'whiteboard_sessions'
 ): Promise<void> {
     const lessonId = doc(collection(db, 'prepared_lessons')).id;
     const lessonData: LessonTemplate['data'] = {};
@@ -35,13 +36,13 @@ export async function saveSessionAsTemplate(
         lessonData[pageKey] = { elements: [], paths: [] };
 
         // Fetch Elements
-        const elQuery = await getDocs(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'elements'));
+        const elQuery = await getDocs(collection(db, collectionName, sessionId, 'pages', pageKey, 'elements'));
         elQuery.forEach(d => {
             lessonData[pageKey].elements.push(d.data() as WhiteboardElement);
         });
 
         // Fetch Paths (Optional, but good for completeness)
-        const pathQuery = await getDocs(query(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'paths'), orderBy('createdAt')));
+        const pathQuery = await getDocs(query(collection(db, collectionName, sessionId, 'pages', pageKey, 'paths'), orderBy('createdAt')));
         pathQuery.forEach(d => {
             lessonData[pageKey].paths.push(d.data());
         });
@@ -61,12 +62,13 @@ export async function saveSessionAsTemplate(
 // 2. Load Template into Session
 export async function loadTemplateToSession(
     sessionId: string,
-    template: LessonTemplate
+    template: LessonTemplate,
+    collectionName: string = 'whiteboard_sessions'
 ): Promise<void> {
     const batch = writeBatch(db);
 
     // Update Session Metadata (totalPages)
-    const sessionRef = doc(db, 'whiteboard_sessions', sessionId);
+    const sessionRef = doc(db, collectionName, sessionId);
     batch.update(sessionRef, { totalPages: template.totalPages, currentPage: 0 });
 
     // Assuming we want to OVERWRITE or MERGE? 
@@ -79,13 +81,13 @@ export async function loadTemplateToSession(
         // Elements
         pageData.elements.forEach(el => {
             // New ID for the fresh copy to ensure independence
-            const newRef = doc(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'elements'));
+            const newRef = doc(collection(db, collectionName, sessionId, 'pages', pageKey, 'elements'));
             batch.set(newRef, { ...el, id: newRef.id });
         });
 
         // Paths
         pageData.paths.forEach(path => {
-            const newRef = doc(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'paths'));
+            const newRef = doc(collection(db, collectionName, sessionId, 'pages', pageKey, 'paths'));
             batch.set(newRef, { ...path, id: newRef.id });
         });
     });
@@ -94,7 +96,7 @@ export async function loadTemplateToSession(
 }
 
 // 3. Clear Session (Helper for "Prepare -> Save -> Clear")
-export async function clearSessionContent(sessionId: string, totalPages: number) {
+export async function clearSessionContent(sessionId: string, totalPages: number, collectionName: string = 'whiteboard_sessions') {
     // Note: Client-side deletion of subcollections is expensive. 
     // We will do a best-effort clear for the current page(s) or just reset the totalPages to 1 and clear page 0?
     // A robust app would use a Cloud Function for recursive delete. 
@@ -105,15 +107,15 @@ export async function clearSessionContent(sessionId: string, totalPages: number)
         const pageKey = String(i);
         const batch = writeBatch(db);
 
-        const elQuery = await getDocs(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'elements'));
+        const elQuery = await getDocs(collection(db, collectionName, sessionId, 'pages', pageKey, 'elements'));
         elQuery.forEach(d => batch.delete(d.ref));
 
-        const pathQuery = await getDocs(collection(db, 'whiteboard_sessions', sessionId, 'pages', pageKey, 'paths'));
+        const pathQuery = await getDocs(collection(db, collectionName, sessionId, 'pages', pageKey, 'paths'));
         pathQuery.forEach(d => batch.delete(d.ref));
 
         await batch.commit(); // Commit per page to avoid limit of 500
     }
 
     // Reset page count
-    await setDoc(doc(db, 'whiteboard_sessions', sessionId), { totalPages: 1, currentPage: 0 }, { merge: true });
+    await setDoc(doc(db, collectionName, sessionId), { totalPages: 1, currentPage: 0 }, { merge: true });
 }

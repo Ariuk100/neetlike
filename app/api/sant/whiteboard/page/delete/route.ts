@@ -3,13 +3,13 @@ import { adminFirestore } from '@/lib/firebaseAdmin';
 
 export async function POST(req: Request) {
     try {
-        const { sessionId, pageIndex } = await req.json();
+        const { sessionId, pageIndex, collectionName = 'whiteboard_sessions' } = await req.json();
 
         if (!sessionId || typeof pageIndex !== 'number') {
             return NextResponse.json({ error: 'Missing sessionId or pageIndex' }, { status: 400 });
         }
 
-        const sessionRef = adminFirestore.collection('whiteboard_sessions').doc(sessionId);
+        const sessionRef = adminFirestore.collection(collectionName).doc(sessionId);
         const sessionDoc = await sessionRef.get();
 
         if (!sessionDoc.exists) {

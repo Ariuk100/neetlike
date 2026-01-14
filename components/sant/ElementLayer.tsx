@@ -13,6 +13,7 @@ import WordScramble from './WordScramble';
 import OpticsGame from './OpticsGame';
 import GraphPlotter from './GraphPlotter';
 import MagneticMinesweeper from './MagneticMinesweeper';
+import AlgorithmVisualizer from './AlgorithmVisualizer';
 
 interface Magnet {
     x: number;
@@ -31,7 +32,7 @@ interface GameResult {
 
 export interface WhiteboardElement {
     id: string;
-    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game' | 'word_scramble' | 'optics_game' | 'graph_plotter' | 'magnetic_minesweeper';
+    type: 'image' | 'text' | 'video' | 'iframe' | 'photon_game' | 'quiz_game' | 'word_scramble' | 'optics_game' | 'graph_plotter' | 'magnetic_minesweeper' | 'algorithm_visualizer';
     x: number;      // Percentage (0-100)
     y: number;      // Percentage (0-100)
     width: number;  // Percentage (0-100)
@@ -60,6 +61,8 @@ export interface WhiteboardElement {
     targetPos?: { x: number; y: number };
     results?: GameResult[];
     gameStartTime?: number;
+    // Algorithm Visualizer properties
+    algoType?: 'bubble_sort' | 'linear_search';
 }
 
 interface ElementLayerProps {
@@ -71,9 +74,20 @@ interface ElementLayerProps {
     selectedElement: string | null;
     onSelect: (id: string | null) => void;
     userName: string;
+    collectionName?: string; // NEW
 }
 
-export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllowedToWrite = false, containerRef, selectedElement, onSelect, userName }: ElementLayerProps) {
+export default function ElementLayer({
+    sessionId,
+    currentPage,
+    isTeacher,
+    isAllowedToWrite = false,
+    containerRef,
+    selectedElement,
+    onSelect,
+    userName,
+    collectionName = 'whiteboard_sessions'
+}: ElementLayerProps) {
     const [elements, setElements] = useState<WhiteboardElement[]>([]);
 
     // Interaction State
@@ -92,10 +106,9 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
     const [editingElement, setEditingElement] = useState<string | null>(null);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-    // Sync elements
     useEffect(() => {
         if (!sessionId) return;
-        const q = query(collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements'));
+        const q = query(collection(db, collectionName, sessionId, 'pages', String(currentPage), 'elements'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const newElements: WhiteboardElement[] = [];
             snapshot.forEach((doc) => {
@@ -289,7 +302,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
             const element = elements.find(el => el.id === selectedElement);
             if (element) {
                 // Persist to Firebase
-                const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', selectedElement);
+                const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', selectedElement);
                 await updateDoc(elementRef, {
                     x: element.x,
                     y: element.y,
@@ -308,7 +321,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
 
     const handleDelete = async (elementId: string) => {
         if (!isTeacher) return;
-        const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', elementId);
+        const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', elementId);
         try {
             await deleteDoc(elementRef);
             onSelect(null);
@@ -345,18 +358,18 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
         if (!element) return;
         const newStyle = { ...element.style, ...styleUpdate };
         setElements(prev => prev.map(el => el.id === elementId ? { ...el, style: newStyle } : el));
-        const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', elementId);
+        const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', elementId);
         await updateDoc(elementRef, { style: newStyle });
     };
     const handleAnimationChange = async (elementId: string, animation: string) => {
         setElements(prev => prev.map(el => el.id === elementId ? { ...el, animation: animation === 'none' ? undefined : animation } : el));
-        const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', elementId);
+        const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', elementId);
         await updateDoc(elementRef, { animation: animation === 'none' ? null : animation });
     };
     const handleTextContentUpdate = async (newContent: string) => {
         if (!editingElement) return;
         setElements(prev => prev.map(el => el.id === editingElement ? { ...el, content: newContent } : el));
-        const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', editingElement);
+        const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', editingElement);
         await updateDoc(elementRef, { content: newContent });
         setEditingElement(null);
     };
@@ -421,6 +434,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
                                 />
                             </div>
                         )}
@@ -465,6 +479,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
                                 />
                                 {!isInteracting && (
                                     <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
@@ -481,6 +496,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
                                 />
                             </div>
                         )}
@@ -493,6 +509,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
                                 />
                                 {!isInteracting && (
                                     <div className="absolute inset-0 bg-transparent z-10 pointer-events-none" />
@@ -508,6 +525,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
                                 />
                             </div>
                         )}
@@ -520,6 +538,20 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                     sessionId={sessionId}
                                     currentPage={currentPage}
                                     userName={userName}
+                                    collectionName={collectionName}
+                                />
+                            </div>
+                        )}
+
+                        {element.type === 'algorithm_visualizer' && (
+                            <div className="w-full h-full relative pointer-events-auto">
+                                <AlgorithmVisualizer
+                                    isTeacher={isTeacher}
+                                    element={element as any}
+                                    sessionId={sessionId}
+                                    currentPage={currentPage}
+                                    userName={userName}
+                                    collectionName={collectionName}
                                 />
                             </div>
                         )}
@@ -548,7 +580,7 @@ export default function ElementLayer({ sessionId, currentPage, isTeacher, isAllo
                                 )}
 
                                 {/* NEW: Video/Iframe/Game Interaction Toggle */}
-                                {(element.type === 'video' || element.type === 'iframe' || element.type === 'word_scramble' || element.type === 'quiz_game' || element.type === 'photon_game' || element.type === 'optics_game' || element.type === 'graph_plotter' || element.type === 'magnetic_minesweeper') && (
+                                {(element.type === 'video' || element.type === 'iframe' || element.type === 'word_scramble' || element.type === 'quiz_game' || element.type === 'photon_game' || element.type === 'optics_game' || element.type === 'graph_plotter' || element.type === 'magnetic_minesweeper' || element.type === 'algorithm_visualizer') && (
                                     <button
                                         className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 z-50 shadow-md pointer-events-auto"
                                         onPointerDown={(e) => {

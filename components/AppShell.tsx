@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Header from '../components/header/Header'
 
-const CHROMELESS_PATHS = ['/not-found', '/auth', '/login', '/register', '/forgot', '/sant', '/',] // Header-гүй хуудасны жагсаалт
+const CHROMELESS_PATHS = ['/not-found', '/auth', '/login', '/register', '/forgot', '/sant/cpp', '/sant', '/',] // Header-гүй хуудасны жагсаалт
 
 type Props = { children: React.ReactNode }
 
@@ -15,6 +15,10 @@ export default function AppShell({ children }: Props) {
 
   if (pathname.startsWith('/sant/whiteboard')) {
     return <>{children}</>
+  }
+
+  if (pathname.startsWith('/sant/cpp')) {
+    return <main className="w-full h-screen overflow-hidden">{children}</main>
   }
 
   if (hideChrome) {

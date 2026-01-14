@@ -50,6 +50,7 @@ interface QuizGameProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
 const OPTION_COLORS = [
@@ -61,8 +62,59 @@ const OPTION_COLORS = [
 
 const DEFAULT_TIME_LIMIT = 5; // seconds
 
+// --- SUB-COMPONENTS ---
+
+interface LeaderboardPanelProps {
+    leaderboard: PlayerScore[];
+    userName: string;
+    questions: Question[];
+}
+
+const LeaderboardPanel = ({ leaderboard, userName, questions }: LeaderboardPanelProps) => (
+    <div className="h-full bg-black/30 lg:border-l border-white/10 flex flex-col min-h-0">
+        <div className="p-3 border-b border-white/10 font-bold bg-black/20 flex items-center gap-2 flex-shrink-0">
+            <Trophy className="w-4 h-4 text-yellow-400" />
+            Leaderboard
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar touch-pan-y min-h-0">
+            {leaderboard.map((player, i) => (
+                <div
+                    key={player.name}
+                    className={`
+                        flex flex-col p-2 rounded 
+                        ${player.name === userName ? 'bg-white/20 ring-1 ring-white/50' : 'bg-white/5'}
+                        transition-all hover:bg-white/10
+                    `}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <span className={`
+                                w-5 h-5 flex items-center justify-center rounded text-xs font-bold
+                                ${i === 0 ? 'bg-yellow-400 text-black' :
+                                    i === 1 ? 'bg-gray-300 text-black' :
+                                        i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-white/70'}
+                            `}>
+                                {i + 1}
+                            </span>
+                            <span className="truncate text-sm font-medium max-w-[80px] sm:max-w-[120px]">{player.name || 'Unknown'}</span>
+                        </div>
+                        <span className="text-xs font-bold text-yellow-300">{player.totalScore || 0}</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-green-500 transition-all duration-500"
+                            style={{ width: `${Math.min(100, (player.currentQuestionIndex / (questions.length || 1)) * 100)}%` }}
+                        />
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
 export default function QuizGame(props: QuizGameProps) {
-    const { isTeacher, element, sessionId, userName } = props;
+    const { isTeacher, element, sessionId, userName, collectionName = 'whiteboard_sessions' } = props;
 
     // Local state
     // Re-added timeLeft state that was accidentally removed
@@ -122,7 +174,7 @@ export default function QuizGame(props: QuizGameProps) {
     // --------------------------------------------------------------------------------
     const updateQuizElement = useCallback(async (updates: Record<string, unknown>) => {
         try {
-            const elementRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(props.currentPage), 'elements', element.id);
+            const elementRef = doc(db, collectionName, sessionId, 'pages', String(props.currentPage), 'elements', element.id);
             await updateDoc(elementRef, updates);
         } catch (e) {
             console.error('Quiz update error:', e);
@@ -497,51 +549,8 @@ export default function QuizGame(props: QuizGameProps) {
 
     // Playing mode (includes showing "Finished" state for individual player)
     if (gameStatus === 'playing') {
-        const LeaderboardPanel = () => (
-            <div className="h-full bg-black/30 lg:border-l border-white/10 flex flex-col">
-                <div className="p-3 border-b border-white/10 font-bold bg-black/20 flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-yellow-400" />
-                    Leaderboard
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar touch-pan-y">
-                    {leaderboard.map((player, i) => (
-                        <div
-                            key={player.name}
-                            className={`
-                                flex flex-col p-2 rounded 
-                                ${player.name === userName ? 'bg-white/20 ring-1 ring-white/50' : 'bg-white/5'}
-                                transition-all hover:bg-white/10
-                            `}
-                        >
-                            <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                    <span className={`
-                                        w-5 h-5 flex items-center justify-center rounded text-xs font-bold
-                                        ${i === 0 ? 'bg-yellow-400 text-black' :
-                                            i === 1 ? 'bg-gray-300 text-black' :
-                                                i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-white/70'}
-                                    `}>
-                                        {i + 1}
-                                    </span>
-                                    <span className="truncate text-sm font-medium max-w-[80px] sm:max-w-[120px]">{player.name || 'Unknown'}</span>
-                                </div>
-                                <span className="text-xs font-bold text-yellow-300">{player.totalScore || 0}</span>
-                            </div>
-                            {/* Progress Bar */}
-                            <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-green-500 transition-all duration-500"
-                                    style={{ width: `${Math.min(100, (player.currentQuestionIndex / questions.length) * 100)}%` }}
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-
         return (
-            <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white">
+            <div className="flex flex-col lg:flex-row w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white min-h-0">
 
                 {/* Mobile Tab Switcher */}
                 <div className="lg:hidden flex border-b border-white/10 bg-black/20 flex-shrink-0">
@@ -602,7 +611,7 @@ export default function QuizGame(props: QuizGameProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 flex flex-col items-center justify-start p-1 sm:p-4 relative overflow-y-auto overflow-x-hidden touch-pan-y">
+                    <div className="flex-1 flex flex-col items-center justify-start p-1 sm:p-4 relative overflow-y-auto overflow-x-hidden touch-pan-y min-h-0">
                         {isTeacher ? (
                             <div className="text-center opacity-70">
                                 <div className="text-4xl sm:text-6xl mb-4">👀</div>
@@ -671,8 +680,12 @@ export default function QuizGame(props: QuizGameProps) {
                 </div>
 
                 {/* Leaderboard Sidebar (Fixed Right on Desktop, Toggle on Mobile) */}
-                <div className={`w-full lg:w-64 flex-shrink-0 ${activeTab === 'leaderboard' ? 'flex-1 custom-scrollbar' : 'hidden lg:flex'}`}>
-                    <LeaderboardPanel />
+                <div className={`w-full lg:w-64 flex-shrink-0 min-h-0 ${activeTab === 'leaderboard' ? 'flex-1' : 'hidden lg:flex'}`}>
+                    <LeaderboardPanel
+                        leaderboard={leaderboard}
+                        userName={userName}
+                        questions={questions}
+                    />
                 </div>
             </div>
         );

@@ -30,6 +30,7 @@ function WhiteboardContent() {
     const router = useRouter();
     const sessionId = searchParams.get('session');
     const role = searchParams.get('role'); // 'teacher' | 'student'
+    const collectionName = searchParams.get('collection') || 'whiteboard_sessions';
 
     const [data, setData] = useState<WhiteboardData | null>(null);
     const [selectedClass, setSelectedClass] = useState('');
@@ -69,7 +70,7 @@ function WhiteboardContent() {
         if (!isWaiting || !assignedTeacherId) return;
 
         // Listen to active session for this teacher in the unified collection
-        const unsub = onSnapshot(doc(db, 'whiteboard_sessions', assignedTeacherId), (doc) => {
+        const unsub = onSnapshot(doc(db, collectionName, assignedTeacherId), (doc) => {
             if (doc.exists()) {
                 const data = doc.data();
                 // Teacher has started a session (isActive check)
@@ -103,8 +104,8 @@ function WhiteboardContent() {
                 class: studentClass
             }));
 
-            // Write to whiteboard_sessions/{sessionId}/students/{studentName}
-            const userRef = doc(db, 'whiteboard_sessions', sessionId, 'students', studentName);
+            // Write to {collectionName}/{sessionId}/students/{studentName}
+            const userRef = doc(db, collectionName, sessionId, 'students', studentName);
 
             // Use setDoc with merge to update presence
             setDoc(userRef, {
@@ -463,7 +464,7 @@ function WhiteboardContent() {
                                     </Button>
                                 </SheetTrigger>
                                 <SheetContent side="right" className="p-0 w-80">
-                                    <StudentList sessionId={sessionId} />
+                                    <StudentList sessionId={sessionId} collectionName={collectionName} />
                                 </SheetContent>
                             </Sheet>
                         </div>
@@ -510,13 +511,14 @@ function WhiteboardContent() {
                         onAddPage={handleAddPage}
                         onDeletePage={handleDeletePage}
                         onNavigatePage={handleNavigatePage}
+                        collectionName={collectionName}
                     />
                 </div>
 
                 {/* Student List Sidebar - Desktop Only */}
                 {isTeacher && (
                     <div className="hidden lg:block w-80 border-l bg-white h-full flex-shrink-0">
-                        <StudentList sessionId={sessionId} />
+                        <StudentList sessionId={sessionId} collectionName={collectionName} />
                     </div>
                 )}
             </div>

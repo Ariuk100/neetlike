@@ -61,9 +61,10 @@ interface OpticsGameProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
-export default function OpticsGame({ element, isTeacher, sessionId, currentPage, userName }: OpticsGameProps) {
+export default function OpticsGame({ element, isTeacher, sessionId, currentPage, userName, collectionName = 'whiteboard_sessions' }: OpticsGameProps) {
     const [level, setLevel] = useState<number>(element.currentLevel || 1);
     const [maxUnlockedLevel, setMaxUnlockedLevel] = useState<number>(element.currentLevel || 1); // Track progress
     const [tools, setTools] = useState<OpticalTool[]>([]);
@@ -80,7 +81,7 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
         if (isTeacher) return; // Teachers don't rank? Or maybe they do. Let's say teachers just facilitate.
         // Actually, user wants "list".
         try {
-            const elRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id);
+            const elRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', element.id);
             await updateDoc(elRef, {
                 [`studentProgress.${userName}`]: {
                     name: userName,
@@ -122,7 +123,7 @@ export default function OpticsGame({ element, isTeacher, sessionId, currentPage,
                 }
             }
 
-            const elRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id);
+            const elRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', element.id);
             await updateDoc(elRef, { gameStatus: 'playing' });
             setIsPlaying(true);
             toast.success("Тоглоом эхэллээ!");

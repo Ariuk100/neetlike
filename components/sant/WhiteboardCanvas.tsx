@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Trash2, Eraser, Pen, Lock, Unlock, ChevronLeft, ChevronRight, Plus, ImageIcon, Type, Video, MousePointer, FolderOpen, FileUp, Globe, FileMinus, Target, Trophy } from 'lucide-react';
@@ -72,6 +72,7 @@ interface WhiteboardCanvasProps {
     onAddPage?: () => void;
     onDeletePage?: () => void;
     onNavigatePage?: (delta: number) => void;
+    collectionName?: string; // NEW: To support other modules like CPP
 }
 
 interface CursorData {
@@ -114,7 +115,8 @@ export default function WhiteboardCanvas({
     totalPages,
     onAddPage,
     onDeletePage,
-    onNavigatePage
+    onNavigatePage,
+    collectionName = 'whiteboard_sessions'
 }: WhiteboardCanvasProps) {
     // Refs
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -151,7 +153,7 @@ export default function WhiteboardCanvas({
     // Sync elements to detect active games
     useEffect(() => {
         if (!sessionId) return;
-        const q = query(collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements'));
+        const q = query(collection(db, collectionName, sessionId, 'pages', String(currentPage), 'elements'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const newElements: WhiteboardElement[] = [];
             snapshot.forEach((doc) => {
@@ -227,7 +229,7 @@ export default function WhiteboardCanvas({
     useEffect(() => {
         if (!sessionId) return;
         const q = query(
-            collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'paths'),
+            collection(db, collectionName, sessionId, 'pages', String(currentPage), 'paths'),
             orderBy('createdAt', 'asc')
         );
 
@@ -248,7 +250,7 @@ export default function WhiteboardCanvas({
         // Teacher listens to everyone. Students only need to listen if they need to see Teacher's laser.
         // To save bandwidth, maybe we only query based on need?
         // But for simplicity, let's listen to 'cursors' collection.
-        const q = query(collection(db, 'whiteboard_sessions', sessionId, 'cursors'));
+        const q = query(collection(db, collectionName, sessionId, 'cursors'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const newCursors: Record<string, CursorData> = {};
@@ -263,6 +265,34 @@ export default function WhiteboardCanvas({
 
         return () => unsubscribe();
     }, [sessionId, userName]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            switch (e.key.toLowerCase()) {
+                case 'v': setTool('cursor'); break;
+                case 'p': setTool('pen'); break;
+                case 'e': setTool('eraser'); break;
+                case 'l': setTool('laser'); break;
+                case 'z': if (e.metaKey || e.ctrlKey) { /* undo logic if any */ } break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Cleanup cursor on tool change or unmount
+    useEffect(() => {
+        return () => {
+            if (sessionId && userName) {
+                const cursorRef = doc(db, collectionName, sessionId, 'cursors', userName);
+                deleteDoc(cursorRef).catch(() => { });
+            }
+        };
+    }, [sessionId, userName, tool]);
 
     // Redraw when paths change
     useEffect(() => {
@@ -338,7 +368,7 @@ export default function WhiteboardCanvas({
 
             // Save to Firestore
             try {
-                await addDoc(collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'paths'), newPath);
+                await addDoc(collection(db, collectionName, sessionId, 'pages', String(currentPage), 'paths'), newPath);
             } catch (error) {
                 console.error("Error saving path:", error);
             }
@@ -405,7 +435,7 @@ export default function WhiteboardCanvas({
             // Actually, let's write updates regardless, but mark the type.
 
             try {
-                const cursorRef = doc(db, 'whiteboard_sessions', sessionId, 'cursors', userName);
+                const cursorRef = doc(db, collectionName, sessionId, 'cursors', userName);
                 await setDoc(cursorRef, {
                     x,
                     y,
@@ -445,12 +475,17 @@ export default function WhiteboardCanvas({
     const handlePointerLeave = (e: React.PointerEvent) => {
         if (isDrawing) endDrawing(e);
         setLocalMousePos(null);
+        // Clear cursor from DB when leaving canvas
+        if (sessionId && userName) {
+            const cursorRef = doc(db, collectionName, sessionId, 'cursors', userName);
+            deleteDoc(cursorRef).catch(() => { });
+        }
     };
 
     // Toolbar actions
     const handleClearConfirm = async () => {
         // Clear paths from Firestore
-        const q = query(collection(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'paths'));
+        const q = query(collection(db, collectionName, sessionId, 'pages', String(currentPage), 'paths'));
         const snapshot = await getDocs(q);
         const batch = writeBatch(db);
         snapshot.forEach((doc) => {
@@ -461,7 +496,7 @@ export default function WhiteboardCanvas({
 
     const togglePermissions = async () => {
         try {
-            const sessionRef = doc(db, 'whiteboard_sessions', sessionId);
+            const sessionRef = doc(db, collectionName, sessionId);
             // Updating the exact field name used in page.tsx: isStudentWriteAllowed
             await updateDoc(sessionRef, {
                 isStudentWriteAllowed: !isAllowedToWrite
@@ -493,7 +528,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
 
             toast.success('Зураг амжилттай хуулагдлаа!');
         } catch (error) {
@@ -529,7 +564,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             setTextDialogOpen(false);
         } catch (error) {
             console.error("Error creating text:", error);
@@ -563,7 +598,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             setVideoDialogOpen(false);
         } catch (error) {
             console.error("Error creating video:", error);
@@ -584,7 +619,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("Photon Race тоглоом нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating game:", error);
@@ -605,7 +640,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("Quiz Game нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating quiz:", error);
@@ -626,7 +661,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("Word Scramble нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating word scramble:", error);
@@ -650,7 +685,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             setIframeDialogOpen(false);
         } catch (error) {
             console.error("Error creating simulation:", error);
@@ -671,7 +706,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("Optics Challenge нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating optics game:", error);
@@ -692,7 +727,7 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("График зурагч нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating graph plotter:", error);
@@ -718,11 +753,33 @@ export default function WhiteboardCanvas({
                 createdBy: userName
             };
 
-            await setDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
             toast.success("Magnetic Minesweeper нэмэгдлээ!");
         } catch (error) {
             console.error("Error creating game:", error);
             toast.error("Тоглоом нэмэхэд алдаа гарлаа");
+        }
+    };
+
+    const createAlgorithmVisualizerElement = async () => {
+        try {
+            const newElement: WhiteboardElement = {
+                id: generateElementId(),
+                type: 'algorithm_visualizer',
+                x: 25,
+                y: 20,
+                width: 50,
+                height: 50,
+                algoType: 'bubble_sort',
+                createdAt: new Date().toISOString(),
+                createdBy: userName
+            };
+
+            await setDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', newElement.id), newElement);
+            toast.success("Алгоритм визуалчлагч нэмэгдлээ!");
+        } catch (error) {
+            console.error("Error creating visualizer:", error);
+            toast.error("Бизуалчлагч нэмэхэд алдаа гарлаа");
         }
     };
 
@@ -732,10 +789,10 @@ export default function WhiteboardCanvas({
     // ------------------------------------------------------------------
     const handleSaveLesson = async (metadata: { title: string; subject: string; grade: string }) => {
         try {
-            await saveSessionAsTemplate(sessionId, { ...metadata, authorName: userName || 'Багш' }, totalPages);
+            await saveSessionAsTemplate(sessionId, { ...metadata, authorName: userName || 'Багш' }, totalPages, collectionName);
             toast.success('Хичээл амжилттай хадгалагдлаа!');
             // User requested: "Clear board and return to page 1" after save
-            await clearSessionContent(sessionId, totalPages);
+            await clearSessionContent(sessionId, totalPages, collectionName);
             toast.info('Самбарыг шинэ хичээлд бэлдэж цэвэрлэлээ.');
         } catch (e) {
             console.error(e);
@@ -746,7 +803,7 @@ export default function WhiteboardCanvas({
     const handleLoadLesson = async (template: LessonTemplate) => {
         if (!confirm(`"${template.title}" хичээлийг ачаалах уу? Одоогийн самбар дээр нэмэгдэх болно.`)) return;
         try {
-            await loadTemplateToSession(sessionId, template);
+            await loadTemplateToSession(sessionId, template, collectionName);
             toast.success('Хичээл ачаалагдлаа!');
         } catch (e) {
             console.error(e);
@@ -760,11 +817,11 @@ export default function WhiteboardCanvas({
 
     return (
         <>
-            <div className="flex flex-col items-center justify-center w-full h-full bg-stone-100 gap-4">
+            <div className="flex flex-col items-center justify-center w-full h-full bg-stone-100 gap-4 overflow-hidden relative">
                 {/* Teacher Toolbar - Inside whiteboard (absolute positioned) */}
                 {showToolbar && isTeacher && (<>
                     {/* UNIFIED MAIN TOOLBAR */}
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 flex items-center gap-2 pointer-events-auto border border-stone-200 max-w-[95vw] overflow-x-auto scrollbar-hide z-50">
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 flex items-center gap-2 pointer-events-auto border border-stone-200 max-w-[95vw] overflow-x-auto scrollbar-hide z-[100]">
                         {/* ... components ... */}
 
                         {/* 1. LESSON CONTROLS (Teacher Only) */}
@@ -952,6 +1009,9 @@ export default function WhiteboardCanvas({
                                             <DropdownMenuItem onSelect={createMagneticMinesweeperElement}>
                                                 <div className="flex items-center">💣 Magnetic Minesweeper</div>
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createAlgorithmVisualizerElement}>
+                                                <div className="flex items-center">📊 Алгоритм Визуалчлагч</div>
+                                            </DropdownMenuItem>
 
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -1094,6 +1154,7 @@ export default function WhiteboardCanvas({
                         selectedElement={selectedElement}
                         onSelect={setSelectedElement}
                         userName={userName || 'Guest'}
+                        collectionName={collectionName}
                     />
 
                     {/* Drawing Canvas - Z-index 50/Increased */}
@@ -1191,7 +1252,7 @@ export default function WhiteboardCanvas({
 
                 {/* Student Toolbar - Outside whiteboard (below canvas) */}
                 {showToolbar && !isTeacher && (
-                    <div className="w-full max-w-4xl bg-white rounded-full shadow-2xl p-2 flex items-center justify-center gap-2 border border-stone-200 overflow-x-auto scrollbar-hide">
+                    <div className="w-full max-w-4xl bg-white rounded-full shadow-2xl p-2 flex items-center justify-center gap-2 border border-stone-200 overflow-x-auto scrollbar-hide z-[100]">
                         {/* Drawing Tools for Students */}
                         <Button
                             variant={tool === 'cursor' ? 'secondary' : 'ghost'}

@@ -54,9 +54,10 @@ interface MagneticMinesweeperProps {
     sessionId: string;
     currentPage: number;
     userName: string;
+    collectionName?: string;
 }
 
-export default function MagneticMinesweeper({ isTeacher, element, sessionId, currentPage, userName }: MagneticMinesweeperProps) {
+export default function MagneticMinesweeper({ isTeacher, element, sessionId, currentPage, userName, collectionName = 'whiteboard_sessions' }: MagneticMinesweeperProps) {
     const GRID_SIZE = element.gridSize || 10;
     const magnets = useMemo(() => element.magnets || [], [element.magnets]);
     const discoveredMagnets = useMemo(() => element.discoveredMagnets || [], [element.discoveredMagnets]);
@@ -107,7 +108,7 @@ export default function MagneticMinesweeper({ isTeacher, element, sessionId, cur
             );
             if (Object.keys(cleanUpdates).length === 0) return;
 
-            const elRef = doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id);
+            const elRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', element.id);
             await updateDoc(elRef, cleanUpdates);
         } catch (e) {
             console.error("Firebase update error:", e);
@@ -183,14 +184,14 @@ export default function MagneticMinesweeper({ isTeacher, element, sessionId, cur
 
         // Update Firestore
         if (status === 'won') {
-            await updateDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id), {
+            await updateDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', element.id), {
                 results: newResults,
                 gameStatus: 'won'
             });
             toast.success("БАЯР ХҮРГЭЕ! Барианд орлоо.");
         } else {
             // "Lost" just resets the player for now, but records the result
-            await updateDoc(doc(db, 'whiteboard_sessions', sessionId, 'pages', String(currentPage), 'elements', element.id), {
+            await updateDoc(doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', element.id), {
                 results: newResults,
                 discoveredMagnets: newDiscovered
             });
