@@ -761,6 +761,23 @@ export default function WhiteboardCanvas({
         }
     };
 
+    const createSortingGameElement = async () => {
+        const id = generateElementId();
+        const element = {
+            id,
+            type: 'sorting_game',
+            x: 25,
+            y: 25,
+            width: 50,
+            height: 50,
+            createdAt: new Date().toISOString(),
+            createdBy: userName
+        };
+        const elementRef = doc(db, collectionName, sessionId, 'pages', String(currentPage), 'elements', id);
+        await setDoc(elementRef, element);
+        toast.success("Sorting Game added!");
+    };
+
     const createAlgorithmVisualizerElement = async () => {
         try {
             const newElement: WhiteboardElement = {
@@ -1011,6 +1028,9 @@ export default function WhiteboardCanvas({
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={createAlgorithmVisualizerElement}>
                                                 <div className="flex items-center">📊 Алгоритм Визуалчлагч</div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={createSortingGameElement}>
+                                                <div className="flex items-center">🔢 Хайрцаг Сортлох</div>
                                             </DropdownMenuItem>
 
                                         </DropdownMenuContent>

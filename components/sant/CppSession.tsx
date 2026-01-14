@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, setDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Users, Code, Trash2, Power, Menu, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { Users, Code, Trash2, Power, Menu, ChevronLeft, ChevronRight, Plus, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     Sheet,
@@ -12,6 +14,9 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet";
 import WhiteboardCanvas from './WhiteboardCanvas';
+import CppLessonView from './CppLessonView';
+import CppLabView from './CppLabView';
+import TeacherLabDashboard from './TeacherLabDashboard';
 
 interface Participant {
     name: string;
@@ -35,6 +40,10 @@ interface SessionData {
     isActive?: boolean;
     updatedAt?: string;
     updatedBy?: string;
+    viewMode?: 'whiteboard' | 'lesson' | 'lab';
+    lessonSlide?: number;
+    activeLab?: string;
+    labStatus?: 'open' | 'locked';
 }
 
 export default function CppSession({
@@ -51,6 +60,7 @@ export default function CppSession({
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [sessionData, setSessionData] = useState<SessionData | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
     // Sync Participants & Presence
     useEffect(() => {
@@ -100,6 +110,24 @@ export default function CppSession({
         return () => unsub();
     }, [sessionId]);
 
+    const handleSetViewMode = async (mode: 'whiteboard' | 'lesson' | 'lab') => {
+        if (!isLead) return;
+        await setDoc(doc(db, 'cpp', sessionId), {
+            viewMode: mode,
+            updatedBy: userName
+        }, { merge: true });
+    };
+
+    const [viewingStudentId, setViewingStudentId] = useState<string | undefined>(undefined);
+
+    const handleSlideChange = async (index: number) => {
+        if (!isLead) return;
+        await setDoc(doc(db, 'cpp', sessionId), {
+            lessonSlide: index,
+            updatedBy: userName
+        }, { merge: true });
+    };
+
     const handleToggleSession = async () => {
         const isActive = sessionData?.isActive;
         await setDoc(doc(db, 'cpp', sessionId), {
@@ -110,11 +138,32 @@ export default function CppSession({
         toast.success(isActive ? "Хичээл зогсоолоо" : "Хичээл эхэллээ");
     };
 
-    const handleClearParticipants = async () => {
-        if (!confirm("Бүх оролцогчдын жагсаалтыг цэвэрлэх үү?")) return;
-        // In a real app, you'd batch delete. Here we just show the intent.
-        toast.info("Цэвэрлэж байна...");
-        // Logic to delete subcollection docs...
+    const handleClearParticipantsClick = () => {
+        setIsClearDialogOpen(true);
+    };
+
+    const handleConfirmClearParticipants = async () => {
+        setIsClearDialogOpen(false);
+        const toastId = toast.loading("Цэвэрлэж байна...");
+
+        try {
+            const batch = writeBatch(db);
+            const participantsRef = collection(db, 'cpp', sessionId, 'participants');
+            const snapshot = await getDocs(participantsRef);
+
+            snapshot.docs.forEach((d) => {
+                // Don't delete the lead teacher themselves if they are in the list
+                if (d.id !== userName) {
+                    batch.delete(d.ref);
+                }
+            });
+
+            await batch.commit();
+            toast.success("Жагсаалт цэвэрлэгдлээ", { id: toastId });
+        } catch (error) {
+            console.error("Error clearing participants:", error);
+            toast.error("Алдаа гарлаа", { id: toastId });
+        }
     };
 
     return (
@@ -166,7 +215,7 @@ export default function CppSession({
                         <Button
                             variant="ghost"
                             className="w-full justify-start h-8 text-stone-400 hover:text-red-500 hover:bg-red-50 text-xs"
-                            onClick={handleClearParticipants}
+                            onClick={handleClearParticipantsClick}
                         >
                             <Trash2 className="w-3 h-3 mr-2" />
                             Жагсаалт цэвэрлэх
@@ -175,22 +224,38 @@ export default function CppSession({
                 )}
             </aside>
 
+            <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Жагсаалт цэвэрлэх</DialogTitle>
+                        <DialogDescription>
+                            Та бүх оролцогчдыг жагсаалтаас хасахдаа итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжгүй.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Болих</Button>
+                        <Button variant="destructive" onClick={handleConfirmClearParticipants}>Цэвэрлэх</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col relative">
                 {/* Session Overlay if inactive */}
-                {!sessionData?.isActive && !isLead && (
-                    <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex items-center justify-center p-6 text-center">
-                        <div className="max-w-sm space-y-4 animate-in fade-in zoom-in duration-300">
-                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
-                                <Code className="w-10 h-10 text-blue-500" />
+                {
+                    !sessionData?.isActive && !isLead && (
+                        <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex items-center justify-center p-6 text-center">
+                            <div className="max-w-sm space-y-4 animate-in fade-in zoom-in duration-300">
+                                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+                                    <Code className="w-10 h-10 text-blue-500" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-stone-900">Хичээл эхлээгүй байна</h2>
+                                <p className="text-stone-500 text-sm">
+                                    Удирдах багш хичээлийг эхлүүлэх хүртэл түр хүлээнэ үү.
+                                </p>
                             </div>
-                            <h2 className="text-2xl font-bold text-stone-900">Хичээл эхлээгүй байна</h2>
-                            <p className="text-stone-500 text-sm">
-                                Удирдах багш хичээлийг эхлүүлэх хүртэл түр хүлээнэ үү.
-                            </p>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Toolbar */}
                 <div className="h-12 border-b border-stone-200 flex items-center px-4 bg-stone-50/50 gap-4">
@@ -282,10 +347,44 @@ export default function CppSession({
                             </span>
                         )}
 
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100 ml-2">
-                            <Code className="w-4 h-4 mr-2" />
-                            Whiteboard
-                        </Button>
+                        {isLead ? (
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg border border-stone-200 ml-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSetViewMode('whiteboard')}
+                                    className={cn("h-7 px-2 text-xs", (!sessionData?.viewMode || sessionData?.viewMode === 'whiteboard') ? "bg-white text-blue-600 shadow-sm" : "text-stone-500 hover:text-stone-900")}
+                                >
+                                    <Code className="w-3.5 h-3.5 mr-1.5" />
+                                    Board
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSetViewMode('lesson')}
+                                    className={cn("h-7 px-2 text-xs", sessionData?.viewMode === 'lesson' ? "bg-white text-blue-600 shadow-sm" : "text-stone-500 hover:text-stone-900")}
+                                >
+                                    <BookOpen className="w-3.5 h-3.5 mr-1.5" />
+                                    Lesson
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSetViewMode('lab')}
+                                    className={cn("h-7 px-2 text-xs", sessionData?.viewMode === 'lab' ? "bg-white text-blue-600 shadow-sm" : "text-stone-500 hover:text-stone-900")}
+                                >
+                                    <Code className="w-3.5 h-3.5 mr-1.5" />
+                                    Lab
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="ml-2 flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
+                                {sessionData?.viewMode === 'lesson' ? <BookOpen className="w-3.5 h-3.5" /> :
+                                    sessionData?.viewMode === 'lab' ? <Code className="w-3.5 h-3.5" /> :
+                                        <Plus className="w-3.5 h-3.5" />}
+                                {sessionData?.viewMode === 'lesson' ? 'LESSON' : sessionData?.viewMode === 'lab' ? 'LAB' : 'BOARD'}
+                            </div>
+                        )}
                     </div>
 
                     <div className="h-4 w-px bg-stone-200 mx-2" />
@@ -295,22 +394,56 @@ export default function CppSession({
                     </div>
                 </div>
 
-                {/* Whiteboard Canvas Area */}
                 <div className="flex-1 overflow-hidden relative">
-                    <WhiteboardCanvas
-                        sessionId={sessionId}
-                        isTeacher={isLead}
-                        isAllowedToWrite={isLead} // Only lead can draw in CPP for now, or we can add permission.
-                        userName={userName}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onAddPage={onAddPage}
-                        onDeletePage={onDeletePage}
-                        onNavigatePage={onNavigatePage}
-                        collectionName="cpp"
-                    />
+                    {sessionData?.viewMode === 'lesson' ? (
+                        <CppLessonView
+                            slideIndex={sessionData?.lessonSlide || 0}
+                            onSlideChange={handleSlideChange}
+                            isTeacher={isLead}
+                        />
+                    ) : sessionData?.viewMode === 'lab' ? (
+                        isLead && !viewingStudentId ? (
+                            <TeacherLabDashboard
+                                sessionId={sessionId}
+                                onViewStudent={(id) => setViewingStudentId(id)}
+                            />
+                        ) : (
+                            <div className="h-full relative">
+                                {isLead && viewingStudentId && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="absolute top-2 right-4 z-50 shadow-lg"
+                                        onClick={() => setViewingStudentId(undefined)}
+                                    >
+                                        <ChevronLeft className="w-4 h-4 mr-2" />
+                                        Буцах (Dashboard)
+                                    </Button>
+                                )}
+                                <CppLabView
+                                    sessionId={sessionId}
+                                    userName={userName}
+                                    isTeacher={isLead}
+                                    studentIdToView={viewingStudentId}
+                                />
+                            </div>
+                        )
+                    ) : (
+                        <WhiteboardCanvas
+                            sessionId={sessionId}
+                            isTeacher={isLead}
+                            isAllowedToWrite={isLead}
+                            userName={userName}
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onAddPage={onAddPage}
+                            onDeletePage={onDeletePage}
+                            onNavigatePage={onNavigatePage}
+                            collectionName="cpp"
+                        />
+                    )}
                 </div>
-            </main>
-        </div>
+            </main >
+        </div >
     );
 }

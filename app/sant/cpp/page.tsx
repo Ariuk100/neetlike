@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -25,6 +27,8 @@ function CppContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
+    const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
 
     // Fetch teachers list
     useEffect(() => {
@@ -123,9 +127,14 @@ function CppContent() {
         }, { merge: true });
     };
 
-    const handleLeadLogin = async () => {
-        const password = prompt("Lead Teacher password:");
-        if (password === "123") { // Simple protection for now
+    const handleLeadLoginClick = () => {
+        setIsLoginDialogOpen(true);
+        setPasswordInput('');
+    };
+
+    const handleConfirmLeadLogin = async () => {
+        if (passwordInput === "123") {
+            setIsLoginDialogOpen(false);
             const params = new URLSearchParams();
             params.set('role', 'lead');
             params.set('name', "Lead Teacher");
@@ -247,13 +256,37 @@ function CppContent() {
                         <Button
                             variant="ghost"
                             className="text-stone-400 hover:text-stone-600 hover:bg-stone-50 text-xs w-full sm:w-auto"
-                            onClick={handleLeadLogin}
+                            onClick={handleLeadLoginClick}
                         >
                             Удирдах багшаар нэвтрэх
                         </Button>
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Удирдах багшаар нэвтрэх</DialogTitle>
+                        <DialogDescription>
+                            Багшийн нууц үгээ оруулна үү (123)
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Input
+                            type="password"
+                            placeholder="Нууц үг"
+                            value={passwordInput}
+                            onChange={(e) => setPasswordInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleConfirmLeadLogin()}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)}>Болих</Button>
+                        <Button onClick={handleConfirmLeadLogin}>Нэвтрэх</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }
