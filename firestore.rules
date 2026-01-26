@@ -1,0 +1,80 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // "users" collection-ийн дүрэм
+    match /users/{userId} {
+      // ✅ ЗАСВАРЛАСАН: Админ хүн бүх хэрэглэгчийн мэдээллийг уншиж болно.
+      allow list: if request.auth.token.role == 'admin';
+      
+      // Админ хүн уншиж болно, ЭСВЭЛ хэрэглэгч зөвхөн өөрийнхөө мэдээллийг уншиж болно.
+      allow read: if request.auth.token.role == 'admin' || request.auth.uid == userId;
+
+      // Хэрэглэгч зөвхөн өөрийнхөө мэдээллийг үүсгэж, шинэчилж болно.
+      allow write: if request.auth.uid == userId;
+
+      // Админ хүн бусдын мэдээллийг шинэчилж болно.
+      allow update: if request.auth.token.role == 'admin';
+
+      // Админ хүн устгаж болно.
+      allow delete: if request.auth.token.role == 'admin';
+    }
+
+    // "uniquePhones" collection-ийн дүрэм
+    // Нэвтэрсэн ямар ч хэрэглэгч шинэ дугаар бүртгэх (create) эсвэл хуучнаа устгах (delete) боломжтой.
+    match /uniquePhones/{phone} {
+      allow read, create, delete: if request.auth != null;
+      allow update: if false; // Update хийхийг хориглоно
+    }
+    
+    // "whiteboard_sessions" collection-ийн дүрэм
+    // Түр хугацаанд бүх хүнд нээлттэй байлгана (Login шаардахгүйгээр сурагчид нэвтэрч байгаа тул)
+    match /whiteboard_sessions/{sessionId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // "saved_boards" collection-ийн дүрэм
+    // Багш нар самбараа хадгалах
+    match /saved_boards/{boardId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // "cpp" collection-ийн дүрэм
+    // Багш нарын сургалтын модуль (багш нар нэрээрээ нэвтэрч байгаа тул түр нээлттэй)
+    match /cpp/{document=**} {
+      allow read, write: if true;
+      allow get, list: if true;
+    }
+
+    // "active_sessions" collection-ийн дүрэм
+    // Багш нар идэвхтэй хичээлээ энд бичиж, сурагчид уншдаг.
+    match /active_sessions/{teacherId} {
+      allow read, write: if true;
+    }
+
+    // "prepared_lessons" collection-ийн дүрэм
+    match /prepared_lessons/{lessonId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // "santexam" collection-ийн дүрэм (Шалгалт өгч байгаа сурагчид)
+    // Багшийн хуудас уншиж болно
+    match /santexam/{code} {
+      allow read: if true;
+      allow write: if false; // Зөвхөн server-side API-ээр бичнэ
+    }
+
+    // "santresult" collection-ийн дүрэм (Шалгалт дууссан сурагчид)
+    // Багшийн хуудас уншиж болно
+    match /santresult/{code} {
+      allow read: if true;
+      allow write: if false; // Зөвхөн server-side API-ээр бичнэ
+    }
+
+    // Бусад бүх collection-д хандахыг хориглоно (аюулгүй байдлын үүднээс)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
