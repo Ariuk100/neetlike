@@ -27,6 +27,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "placehold.co" },
       // Firebase Storage
       { protocol: "https", hostname: "firebasestorage.googleapis.com" },
+      { protocol: "https", hostname: "storage.googleapis.com" },
+      // Google Drive
+      { protocol: "https", hostname: "drive.google.com" },
     ],
   },
   async headers() {

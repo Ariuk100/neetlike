@@ -33,7 +33,7 @@ export async function getSpreadsheetData(spreadsheetId: string, range: string) {
         return response.data.values;
     } catch (error: unknown) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        console.error('getSpreadsheetData Error:', (error as any)?.response?.data || (error as Error).message);
+        console.error('getSpreadsheetData Error:', error, (error as any)?.response?.data || (error as Error).message);
         throw error;
     }
 }

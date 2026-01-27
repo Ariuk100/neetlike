@@ -76,6 +76,7 @@
     "react-dom": "19.1.0",
     "react-hook-form": "^7.65.0",
     "react-hot-toast": "^2.6.0",
+    "react-intersection-observer": "^10.0.2",
     "react-katex": "^3.1.0",
     "react-player": "^3.4.0",
     "react-resizable-panels": "^3.0.6",

@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "Physics Education & Dashboard System",
 };
 
+import QueryProvider from '@/app/components/QueryProvider';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,16 +23,18 @@ export default function RootLayout({
   return (
     <html lang="mn" suppressHydrationWarning>
       <body>
-        <AuthProvider>
-          <CacheProvider>
-            <AppShell>
-              {children}
-            </AppShell>
-            {/* sonner-ийн Toaster ашиглагдаж байна */}
-            <Toaster richColors position="top-right" />
-            <ScrollToTopButton />
-          </CacheProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <CacheProvider>
+              <AppShell>
+                {children}
+              </AppShell>
+              {/* sonner-ийн Toaster ашиглагдаж байна */}
+              <Toaster richColors position="top-right" />
+              <ScrollToTopButton />
+            </CacheProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

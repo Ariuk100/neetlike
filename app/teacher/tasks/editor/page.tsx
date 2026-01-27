@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import NextImage from 'next/image';
 import { fetchQuestions, upsertQuestion, uploadImage, fetchCategories } from '../sheets-action';
+import { useQueryClient } from '@tanstack/react-query';
 import { optimizeImage } from '@/lib/image-utils';
 import {
-    Loader2, ChevronLeft, Save, Upload, Image as ImageIcon,
+    Loader2, ChevronLeft, Save, Upload,
     Eye, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,7 +50,7 @@ function EditorContent() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [formData, setFormData] = useState<any>({
         qType: 'MCQ',
-        status: 'active',
+        status: 'inactive',
         subject: '',
         topic: '',
         subTopic: '',
@@ -107,20 +109,38 @@ function EditorContent() {
         )).filter(Boolean);
     }, [categories, formData.subject, formData.topic]);
 
+    const calculateHash = async (file: File) => {
+        const buffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
         const file = e.target.files?.[0];
         if (!file) return;
         setUploading(field);
         try {
             const optimized = await optimizeImage(file);
+            const hash = await calculateHash(optimized);
+
             const fd = new FormData();
             fd.append('file', optimized);
+            fd.append('hash', hash);
+
             const result = await uploadImage(fd);
+
+            if (result.error) {
+                toast.error(result.error);
+                return;
+            }
+
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setFormData((prev: any) => ({ ...prev, [field]: result.url }));
             toast.success('Зураг амжилттай хадгалагдлаа');
-        } catch {
-            toast.error("Зураг хуулахад алдаа гарлаа");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+            toast.error(`Зураг хуулахад алдаа гарлаа: ${error.message || 'Тодорхойгүй алдаа'}`);
         } finally {
             setUploading(null);
         }
@@ -131,12 +151,15 @@ function EditorContent() {
         setFormData((prev: any) => ({ ...prev, [field]: '' }));
     };
 
+    const queryClient = useQueryClient();
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         setSaving(true);
         try {
             await upsertQuestion(formData);
             toast.success("Амжилттай хадгалагдлаа");
+            queryClient.invalidateQueries({ queryKey: ['questions'] });
             router.push('/teacher/tasks');
         } catch {
             toast.error("Хадгалахад алдаа гарлаа");
@@ -155,7 +178,15 @@ function EditorContent() {
                 <div className="flex items-center gap-3">
                     {url ? (
                         <div className="flex items-center gap-2 p-2 bg-white border border-stone-200 rounded-lg shadow-sm group">
-                            <img src={url} alt="Thumbnail" className="h-10 w-10 object-contain rounded" />
+                            <div className="relative h-10 w-10">
+                                <NextImage
+                                    src={url}
+                                    alt="Thumbnail"
+                                    fill
+                                    className="object-contain rounded"
+                                    sizes="40px"
+                                />
+                            </div>
                             <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-stone-400 hover:text-red-500" onClick={() => removeImage(field)}>
                                 <Trash2 size={14} />
                             </Button>
@@ -197,12 +228,12 @@ function EditorContent() {
                         <h1 className="text-xl font-bold text-stone-900 leading-none">
                             {rowIndex ? 'Асуулт засах' : 'Шинэ асуулт'}
                         </h1>
-                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1.5">{formData.qType}</p>
+                        <p className="text-xs text-stone-500 mt-1.5">{formData.qType === 'MCQ' ? 'Олон сонголттой асуулт' : 'Бодлого төрлийн асуулт'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" onClick={() => router.back()} className="text-stone-500 hover:text-stone-700">Цуцлах</Button>
-                    <Button onClick={() => handleSubmit()} disabled={saving} className="bg-stone-900 hover:bg-stone-800 text-white gap-2 px-6">
+                    <Button onClick={() => handleSubmit()} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-6 shadow-sm shadow-blue-200">
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Хадгалах
                     </Button>
@@ -217,7 +248,7 @@ function EditorContent() {
                         {/* Type Selection */}
                         {!rowIndex && (
                             <div className="space-y-4">
-                                <Label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Асуултын төрөл</Label>
+                                <Label className="text-sm font-semibold text-stone-700">Асуултын төрөл</Label>
                                 <div className="grid grid-cols-2 gap-4">
                                     {['MCQ', 'Problem'].map(type => (
                                         <button
@@ -226,12 +257,12 @@ function EditorContent() {
                                             className={cn(
                                                 "p-4 rounded-xl border text-left transition-all",
                                                 formData.qType === type
-                                                    ? "bg-white border-stone-900 ring-1 ring-stone-900"
+                                                    ? "bg-white border-blue-600 ring-1 ring-blue-600 shadow-md"
                                                     : "bg-white border-stone-200 text-stone-400 hover:border-stone-300"
                                             )}
                                         >
-                                            <div className="text-sm font-bold text-stone-900">{type === 'MCQ' ? 'MCQ' : 'БОДЛОГО'}</div>
-                                            <div className="text-[10px] text-stone-500 mt-1 uppercase tracking-tight">
+                                            <div className="text-sm font-bold text-stone-900">{type === 'MCQ' ? 'MCQ' : 'Бодлого'}</div>
+                                            <div className="text-xs text-stone-500 mt-1">
                                                 {type === 'MCQ' ? 'Олон сонголттой' : 'Текст эсвэл тоон хариулт'}
                                             </div>
                                         </button>
@@ -242,7 +273,7 @@ function EditorContent() {
 
                         {/* Metadata Section */}
                         <div className="space-y-6">
-                            <Label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ерөнхий мэдээлэл</Label>
+                            <Label className="text-sm font-semibold text-stone-700">Ерөнхий мэдээлэл</Label>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label className="text-xs text-stone-500">Хичээл</Label>
@@ -320,9 +351,10 @@ function EditorContent() {
                         </div>
 
                         {/* Question Content */}
-                        <div className="space-y-6">
-                            <Label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Асуултын агуулга</Label>
-                            <div className="space-y-4">
+                        <div className="space-y-4">
+                            <Label className="text-sm font-semibold text-stone-700">Асуултын агуулга</Label>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-stone-500">Асуултын текст</Label>
                                 <Textarea
                                     value={formData.questionText}
                                     onChange={(e) => setFormData({ ...formData, questionText: e.target.value })}
@@ -358,8 +390,8 @@ function EditorContent() {
                                         <div key={i} className="space-y-3 p-4 bg-white border border-stone-100 rounded-lg shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <div className={cn(
-                                                    "h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold",
-                                                    formData.correctAnswer === i.toString() ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-400"
+                                                    "h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all",
+                                                    formData.correctAnswer === i.toString() ? "bg-blue-600 text-white shadow-md shadow-blue-100" : "bg-stone-100 text-stone-400"
                                                 )}>
                                                     {i}
                                                 </div>
@@ -390,7 +422,7 @@ function EditorContent() {
 
                         {/* Solution Section */}
                         <div className="space-y-6 pt-4 border-t border-stone-100">
-                            <Label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Бодолт ба Тайлбар</Label>
+                            <Label className="text-sm font-semibold text-stone-700">Бодолт ба Тайлбар</Label>
                             <div className="space-y-4">
                                 <Textarea
                                     value={formData.solutionText}
@@ -406,9 +438,9 @@ function EditorContent() {
 
                 {/* Preview Pane */}
                 <div className="w-1/2 bg-white flex flex-col p-12 overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center gap-3 mb-10 text-stone-300">
+                    <div className="flex items-center gap-3 mb-10 text-stone-400">
                         <Eye size={16} />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] pt-0.5">Live Preview</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider">Урьдчилан харах</span>
                         <div className="flex-1 border-b border-stone-100" />
                     </div>
 
@@ -416,8 +448,8 @@ function EditorContent() {
                         {/* Meta */}
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="bg-stone-100 text-stone-500 font-bold uppercase text-[9px] px-2 py-0.5 rounded-full">{formData.subject || 'Хичээл'}</Badge>
-                                <Badge variant="secondary" className="bg-stone-100 text-stone-500 font-bold uppercase text-[9px] px-2 py-0.5 rounded-full">{formData.grade} анги</Badge>
+                                <Badge variant="secondary" className="bg-stone-100 text-stone-600 font-medium text-[10px] px-2 py-0.5 rounded-full">{formData.subject || 'Хичээл'}</Badge>
+                                <Badge variant="outline" className="text-stone-400 border-stone-100 text-[10px] px-2 py-0.5 rounded-full">{formData.grade ? `${formData.grade} анги` : 'Анги'}</Badge>
                             </div>
                             <span className="text-[9px] font-bold text-stone-300 uppercase tracking-widest">{formData.topic}</span>
                         </div>
@@ -428,7 +460,15 @@ function EditorContent() {
                                 <LatexRenderer text={formData.questionText || 'Асуултын текст...'} />
                             </div>
                             {formData.questionImage && (
-                                <img src={formData.questionImage} alt="Question" className="w-full h-auto object-contain rounded-xl shadow-lg border border-stone-100" />
+                                <div className="relative w-full h-[300px] rounded-xl shadow-lg border border-stone-100 overflow-hidden">
+                                    <NextImage
+                                        src={formData.questionImage}
+                                        alt="Question"
+                                        fill
+                                        className="object-contain"
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    />
+                                </div>
                             )}
                         </div>
 
@@ -438,11 +478,11 @@ function EditorContent() {
                                 {[1, 2, 3, 4, 5].map(i => (
                                     <div key={i} className={cn(
                                         "flex items-center p-4 rounded-xl border transition-all",
-                                        formData.correctAnswer === i.toString() ? "bg-stone-50 border-stone-900" : "bg-white border-stone-100"
+                                        formData.correctAnswer === i.toString() ? "bg-blue-50/50 border-blue-600 shadow-sm" : "bg-white border-stone-100"
                                     )}>
                                         <div className={cn(
-                                            "h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0",
-                                            formData.correctAnswer === i.toString() ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-400"
+                                            "h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                                            formData.correctAnswer === i.toString() ? "bg-blue-600 text-white shadow-sm" : "bg-stone-100 text-stone-400"
                                         )}>
                                             {i}
                                         </div>
@@ -451,7 +491,15 @@ function EditorContent() {
                                                 <LatexRenderer text={formData[`opt${i}`] || `Хувилбар ${i}`} />
                                             </div>
                                             {formData[`opt${i}Image`] && (
-                                                <img src={formData[`opt${i}Image`]} alt={`Opt ${i}`} className="mt-3 h-auto max-h-[120px] object-contain rounded-lg border border-stone-50" />
+                                                <div className="relative mt-3 h-32 w-full max-w-[200px]">
+                                                    <NextImage
+                                                        src={formData[`opt${i}Image`]}
+                                                        alt={`Opt ${i}`}
+                                                        fill
+                                                        className="object-contain rounded-lg border border-stone-50"
+                                                        sizes="200px"
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -473,7 +521,15 @@ function EditorContent() {
                                 <div className="text-sm text-stone-600 leading-relaxed">
                                     <LatexRenderer text={formData.solutionText} />
                                     {formData.solutionImage && (
-                                        <img src={formData.solutionImage} alt="Solution" className="mt-6 w-full rounded-xl" />
+                                        <div className="relative mt-6 w-full h-[400px]">
+                                            <NextImage
+                                                src={formData.solutionImage}
+                                                alt="Solution"
+                                                fill
+                                                className="object-contain rounded-xl"
+                                                sizes="(max-width: 768px) 100vw, 50vw"
+                                            />
+                                        </div>
                                     )}
                                 </div>
                             </div>

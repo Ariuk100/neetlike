@@ -15,7 +15,7 @@ if (!admin.apps.length) {
     // Base64-ээс буцааж JSON string болгоно
     // Энэ нь private_key доторх \\n-ийг \n болгон автоматаар хувиргана.
     const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
-    
+
     // JSON string-ийг объект болгон парс хийнэ
     const serviceAccount = JSON.parse(serviceAccountJson);
 
@@ -23,7 +23,7 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       // databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`,
-      // storageBucket: `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.appspot.com`
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     });
   } catch (error) {
     console.error('Firebase Admin эхлүүлэхэд алдаа гарлаа:', error);
@@ -31,5 +31,5 @@ if (!admin.apps.length) {
 }
 
 export const adminAuth = admin.auth();
-// export const adminFirestore = admin.firestore(); // Хэрэв Firestore ашиглах бол uncomment хийнэ
-export const adminFirestore = admin.firestore(); // 🔴 Энэ мөрийг нэмнэ
+export const adminFirestore = admin.firestore();
+export const adminStorage = admin.storage();
